@@ -109,6 +109,13 @@ object FlagWar {
     // attack/flag update tick interval
     internal const val ATTACK_TICK: Int = 20
 
+    // max distance (blocks) a player needs to be from a flag to receive its progress text
+    // display. Without this, attackTick() below updated (and kept a live entity for) every
+    // online player regardless of distance, so cost scaled as O(concurrent attacks x total
+    // online players) instead of O(concurrent attacks x nearby players) -- a real lag source
+    // on populated servers during multi-front wars.
+    private const val TEXT_DISPLAY_RANGE_SQUARED: Double = 64.0 * 64.0
+
     // flag that save required
     internal var needsSave: Boolean = false
 
@@ -950,9 +957,17 @@ object FlagWar {
             val progressNormalized: Float = progress.toFloat() / attack.attackTime.toFloat()
             attack.progressBar.progress(progressNormalized)
 
-            // update progress text
+            // update progress text -- only for players actually near the flag. Also drop the
+            // display for anyone who was tracked but has since wandered out of range, so their
+            // entity doesn't linger showing a frozen countdown.
+            val flagPos = attack.textDisplay.loc
             for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
-                attack.textDisplay.update(player)
+                val inRange = player.position.distanceSquared(flagPos) <= TEXT_DISPLAY_RANGE_SQUARED
+                if (inRange) {
+                    attack.textDisplay.update(player)
+                } else if (attack.textDisplay.playerTextDisplays.containsKey(player.uuid)) {
+                    attack.textDisplay.removePlayerTextDisplay(player)
+                }
             }
         }
     }

@@ -155,12 +155,10 @@ class AttackTextDisplay(
     // per-player displays
     val playerTextDisplays: MutableMap<UUID, Entity> = mutableMapOf()
 
-    init {
-        // create textdisplays for all online players
-        for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
-            update(player)
-        }
-    }
+    // Entities are created lazily, per-player, the first time FlagWar.attackTick() finds them
+    // in range -- not eagerly for every online player here. See TEXT_DISPLAY_RANGE_SQUARED in
+    // FlagWar.kt for why: this used to unconditionally spawn+update one entity per online
+    // player per attack regardless of distance.
 
     /**
      * Remove a player's TextDisplay.
