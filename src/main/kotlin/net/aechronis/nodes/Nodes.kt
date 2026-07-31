@@ -157,6 +157,16 @@ object Nodes {
         }
     }
 
+    /**
+     * Public entry point to enable war/FlagWar without going through the /nodesadmin command --
+     * that command tree is wired exclusively for Player senders (via the NodesCommand/Command
+     * wrapper), so it can't be invoked from console or programmatically at startup. Mirrors what
+     * NodesAdminWarEnableCommand does.
+     */
+    fun enableWar(canAnnexTerritories: Boolean = true, canOnlyAttackBorders: Boolean = false, destructionEnabled: Boolean = true) {
+        FlagWar.enable(canAnnexTerritories, canOnlyAttackBorders, destructionEnabled)
+    }
+
     internal fun cleanup() {
         residents.values.forEach { it.destroyMinimap() }
         towns.values.forEach { town -> if (town.income.pushToStorage(true)) town.needsUpdate() }
