@@ -212,6 +212,12 @@ object Deserializer {
                         val material = Material.fromKey(type.lowercase())
                         if (material !== null) {
                             income.put(material, townIncomeJson.get(type).asInt)
+                        } else {
+                            // Every other parse-failure branch in this file logs to stderr; this
+                            // one silently dropped the entry -- a version bump or hand-edit typo
+                            // in a Material key could vanish real player-earned currency with
+                            // zero trace.
+                            System.err.println("Invalid material in stored income for town $name: $type")
                         }
                     }
                 }

@@ -43,10 +43,13 @@ class NationCommand : NodesCommand("n", null, "nation") {
 class NationHelpCommand : NodesCommand("help") {
     init {
         setDefaultExecutor { player, resident, context ->
+            // Was listing "/nation color", which isn't a player command (color is admin-only,
+            // under /nodesadmin nation color) -- disagreed with both the top-level /nation menu
+            // and NationCommand's own subcommand list.
             Message.print(player, "${ChatColor.BOLD}[Nodes] Nation commands:")
             Message.print(player, "/nation list${ChatColor.WHITE}: List all nations")
             Message.print(player, "/nation online${ChatColor.WHITE}: View nation's online players")
-            Message.print(player, "/nation color${ChatColor.WHITE}: Set nation color on map")
+            Message.print(player, "/nation info${ChatColor.WHITE}: View nation details")
         }
     }
 }

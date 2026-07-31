@@ -37,9 +37,13 @@ import net.minestom.server.timer.TaskSchedule
 import java.util.EnumSet
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.atomic.AtomicInteger
 
-// internal town id counter
-private var townNametagIdCounter: Int = 0
+// internal town id counter.
+// Was a plain `var Int++`, not atomic -- concurrent Town construction (e.g. two towns loading
+// from disk around the same time) could hand out the same nametagId twice, corrupting the
+// scoreboard-team-based ally/enemy nametag color display for whichever town lost the race.
+private val townNametagIdCounter = AtomicInteger(0)
 
 class Town(
     val uuid: UUID,
@@ -191,6 +195,24 @@ class Town(
                 resident.needsUpdate()
                 resident.player()?.let { player -> nation?.playersOnline?.remove(player) }
             }
+
+            // Cancel pending join applications' auto-expiry tasks so they don't fire later
+            // against this now-orphaned town.
+            town.applications.values.forEach { it.cancel() }
+            town.applications.clear()
+
+            // Invalidate outstanding town-invites pointing at this town -- without this, a player
+            // who accepts an invite after the town was deleted got silently attached to a
+            // "zombie" Town object kept alive only by their own stale `invitingTown` reference.
+            Nodes.residents.values.forEach { resident ->
+                if (resident.invitingTown === town) {
+                    resident.inviteThread?.cancel()
+                    resident.invitingTown = null
+                    resident.invitingPlayer = null
+                    resident.inviteThread = null
+                }
+            }
+
             Nodes.towns.remove(town.name)
             Nodes.needsSave = true
             Resident.renderMinimaps()
@@ -204,10 +226,28 @@ class Town(
             town.territories.remove(territory.id)
             territory.town = null
             town.annexed.remove(territory.id)
+            // Was leaving the town's plots inside this territory untouched -- these "ghost
+            // plots" (including per-player permission grants for possibly-since-kicked members)
+            // silently reactivated with no staff review the moment the town later reclaimed the
+            // same territory.
+            purgePlotsInTerritory(town, territory)
             town.needsUpdate()
             Nodes.needsSave = true
             Resident.renderMinimaps()
             return Result.success(territory)
+        }
+
+        // Removes any of a town's plots that fall (even partially) within the given territory's
+        // chunks -- used when the town loses ownership of that territory outright.
+        private fun purgePlotsInTerritory(town: Town, territory: Territory) {
+            val plotsToRemove = town.plots.values.filter { plot ->
+                (Math.floorDiv(plot.minX, 16)..Math.floorDiv(plot.maxX, 16)).any { chunkX ->
+                    (Math.floorDiv(plot.minZ, 16)..Math.floorDiv(plot.maxZ, 16)).any { chunkZ ->
+                        Territory.fromCoord(Coord(chunkX, chunkZ))?.id == territory.id
+                    }
+                }
+            }
+            plotsToRemove.forEach { town.plots.remove(it.name) }
         }
 
         fun addTerritory(town: Town, territory: Territory): Result<Territory> {
@@ -301,6 +341,11 @@ class Town(
             Resident.stopPlotSelection(resident)
             town.officers.remove(resident)
             town.residents.remove(resident)
+            // Was left in place on kick/leave -- a resident's per-player plot permission grants
+            // silently reapplied, unreviewed, if they ever rejoined the town later.
+            town.plots.values.forEach { plot ->
+                enumValues<TownPermissions>().forEach { permission -> plot.setPlayerPermission(resident.uuid, permission, null) }
+            }
             resident.town = null
             val player = resident.player()
             town.nation?.let { nation ->
@@ -424,7 +469,7 @@ class Town(
 
     // town numeric id, not saved, can change on reload
     // used by nametag scoreboard system (cannot use name because 16 char team limit)
-    val townNametagId: Int = townNametagIdCounter++
+    val townNametagId: Int = townNametagIdCounter.getAndIncrement()
 
     // residents belong to town
     val residents: HashSet<Resident> = hashSetOf()
@@ -567,7 +612,13 @@ class Town(
         val home = t.home
         val spawnpoint = doubleArrayOf(t.spawnpoint.x, t.spawnpoint.y, t.spawnpoint.z)
         val color = intArrayOf(t.color.r, t.color.g, t.color.b)
-        val permissions = t.permissions.copyOf()
+
+        // Was `t.permissions.copyOf()` -- EnumArrayMap.copyOf() only clones the backing array,
+        // each slot still shares the *same* mutable EnumSet instance with the live Town. That
+        // broke this class's own "immutable snapshot" contract: a permissions-changing command
+        // running while the async save serializer iterates this EnumSet is a genuine
+        // concurrent read-during-mutation on a non-thread-safe collection. Deep-copy each set.
+        val permissions = createEnumArrayMap<TownPermissions, EnumSet<PermissionsGroup>> { type -> EnumSet.copyOf(t.permissions[type]) }
         val residents = t.residents.map { x -> x.uuid }
         val officers = t.officers.map { x -> x.uuid }
         val territories = t.territories.toList()

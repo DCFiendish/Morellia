@@ -24,7 +24,11 @@ object ArgumentTerritory {
                 }
         }
         return word.map { input ->
-            Territory.fromId(TerritoryId(input.toInt()))
+            // Was a bare .toInt() -- unlike ArgumentTerritoryArray's parsing, a non-numeric
+            // argument here threw a raw NumberFormatException instead of the intended graceful
+            // "Territory not found" syntax error.
+            val id = input.toIntOrNull() ?: throw ArgumentSyntaxException("Territory not found", input, 1)
+            Territory.fromId(TerritoryId(id))
                 ?: throw ArgumentSyntaxException("Territory not found", input, 1)
         }
     }

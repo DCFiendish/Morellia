@@ -230,7 +230,17 @@ object Nodes {
                 territory.occupier = old.occupier
             }
             territories[data.id] = territory
-            data.chunks.forEach { territoryChunks[it] = TerritoryChunk(it, territory) }
+            data.chunks.forEach { coord ->
+                // Nothing previously stopped two territories from listing the same chunk in
+                // world.json -- the later one in load order silently won with no trace, and the
+                // earlier territory's chunk map entry just vanished. Log so a bad map edit is
+                // visible instead of manifesting later as a territory missing part of its claim.
+                val existing = territoryChunks[coord]
+                if (existing != null && existing.territory.id != territory.id) {
+                    System.err.println("[Nodes] Territory ${territory.id} claims chunk $coord which is already claimed by territory ${existing.territory.id} -- overwriting, check world.json for overlapping territories")
+                }
+                territoryChunks[coord] = TerritoryChunk(coord, territory)
+            }
         }
     }
 

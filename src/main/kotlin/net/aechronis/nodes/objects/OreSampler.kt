@@ -161,7 +161,10 @@ class OreSampler(
         // 1. iterate ores and generate array of y-intervals and their ore deposits
         var yStart = 0
         var yEnd: Int = Y_WORLD_MAX
-        while (yStart < Y_WORLD_MAX) {
+        // Was `yStart < Y_WORLD_MAX` -- once yStart reached the top level (255) the loop exited
+        // without ever building an interval for it, so itemsAtHeight[255] stayed null and ore
+        // never sampled at the single topmost configured Y-level.
+        while (yStart <= Y_WORLD_MAX) {
 
             // find closest interval edge
             yEnd = ores.fold(yEnd) { y, oreDeposit ->

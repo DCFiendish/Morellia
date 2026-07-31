@@ -10,6 +10,7 @@ import net.aechronis.nodes.commands.arguments.ArgumentResident
 import net.aechronis.nodes.commands.arguments.ArgumentTown
 import net.aechronis.nodes.constants.PermissionsGroup
 import net.aechronis.nodes.constants.TownPermissions
+import net.aechronis.nodes.listeners.hasTownPermissions
 import net.aechronis.nodes.objects.NodesCommand
 import net.aechronis.nodes.objects.Resident
 import net.aechronis.nodes.objects.Territory
@@ -274,7 +275,9 @@ class TownInviteCommand : NodesCommand("invite") {
                 Message.error(player, "That player is not online")
                 return@addSyntax
             } else if (invitee == player) {
-                Message.error(player, "You're already in your town")
+                // Was copy-pasted from an unrelated scenario ("You're already in your town")
+                // and was misleading for what's actually a self-invite attempt.
+                Message.error(player, "You cannot invite yourself")
                 return@addSyntax
             }
 
@@ -747,16 +750,15 @@ class TownIncomeCommand : NodesCommand("income") {
         }
 
         addSyntax({ player, resident, town, context ->
-            // check player permissions
-            val hasPermissions = if (resident === town.leader || town.officers.contains(resident)) {
-                true
-            } else if (town.permissions[TownPermissions.INCOME].contains(PermissionsGroup.TOWN) && resident.town === town) {
-                true
-            } else if (town.permissions[TownPermissions.INCOME].contains(PermissionsGroup.TRUSTED) && resident.town === town && resident.trusted) {
-                true
-            } else {
-                false
-            }
+            // Was a bespoke, incomplete copy of the permission check (only TOWN/TRUSTED, both
+            // additionally requiring in-town membership even though the other groups don't need
+            // that check) instead of reusing NodesWorldListener's real evaluator -- a leader who
+            // configured `income` access for nation/ally/outsider got a false sense of working
+            // configuration, since this command silently kept denying everyone outside
+            // leader/officer/trusted-member no matter what was configured.
+            val hasPermissions = resident === town.leader ||
+                town.officers.contains(resident) ||
+                hasTownPermissions(TownPermissions.INCOME, town, resident)
 
             // open town inventory
             if (hasPermissions) {

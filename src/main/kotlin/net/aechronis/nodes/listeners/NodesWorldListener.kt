@@ -434,7 +434,7 @@ private fun hasWildernessPermissions(territory: Territory?): Boolean {
  * town: town
  * player: player interacting in town
  */
-private fun hasTownPermissions(perms: TownPermissions, town: Town, player: Resident): Boolean {
+internal fun hasTownPermissions(perms: TownPermissions, town: Town, player: Resident): Boolean {
     if (town.permissions[perms].contains(PermissionsGroup.TOWN) && player.town === town) {
         return true
     } else if (town.permissions[perms].contains(PermissionsGroup.TRUSTED) && player.town === town && player.trusted) {
@@ -556,9 +556,15 @@ private fun hasWarPermissions(resident: Resident, territory: Territory, territor
 
 // handle hidden ore generation during mining
 private fun handleHiddenOre(player: Player, block: BlockVec) {
-    // ignore hidden ore for silk touch tools
+    // ignore hidden ore for silk touch tools.
+    // Was `inMainHand?.get(...)?.level(...) != 0` -- for an empty hand, or any tool with no
+    // ENCHANTMENTS component at all (i.e. any ordinary unenchanted tool), the whole safe-call
+    // chain evaluates to null, and `null != 0` is true. That silently disabled hidden ore for
+    // every unenchanted pickaxe, not just actual silk touch ones. Default the missing case to
+    // level 0 explicitly so only a real Silk Touch enchantment suppresses the ore roll.
     val inMainHand: ItemStack? = player.itemInMainHand
-    if (inMainHand?.get(DataComponents.ENCHANTMENTS)?.level(Enchantment.SILK_TOUCH) != 0) {
+    val silkTouchLevel = inMainHand?.get(DataComponents.ENCHANTMENTS)?.level(Enchantment.SILK_TOUCH) ?: 0
+    if (silkTouchLevel != 0) {
         return
     }
 

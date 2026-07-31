@@ -298,12 +298,22 @@ class NodesAdminTownAddTerritoryCommand : NodesCommand("addterritory", "nodes.ad
         val territoriesArg = ArgumentTerritoryArray.create("territory-ids")
 
         addSyntax({ player, resident, context ->
-            // add territories
+            // Was unconditionally reporting full success regardless of each addTerritory()
+            // call's actual Result -- an admin could be told "added 3 territories" when one
+            // silently no-oped (e.g. already owned by another town), specifically during the
+            // high-pressure moments (contested wartime territory changes) when accurate
+            // feedback matters most.
+            var succeeded = 0
             for (terr in context[territoriesArg]) {
-                Town.addTerritory(context[townArg], terr)
+                val result = Town.addTerritory(context[townArg], terr)
+                if (result.isSuccess) {
+                    succeeded++
+                } else {
+                    Message.error(player, "Failed to add territory ${terr.id}: ${result.exceptionOrNull()?.message}")
+                }
             }
 
-            Message.print(player, "Added ${context[territoriesArg].size} territories to town \"${context[townArg].name}\"")
+            Message.print(player, "Added $succeeded/${context[territoriesArg].size} territories to town \"${context[townArg].name}\"")
         }, townArg, territoriesArg)
     }
 }
@@ -318,12 +328,19 @@ class NodesAdminTownRemoveTerritoryCommand : NodesCommand("removeterritory", "no
         val territoriesArg = ArgumentTerritoryArray.create("territory-ids")
 
         addSyntax({ player, resident, context ->
-            // remove territories
+            // See NodesAdminTownAddTerritoryCommand -- was unconditionally reporting full
+            // success regardless of each unclaim() call's actual Result.
+            var succeeded = 0
             for (terr in context[territoriesArg]) {
-                Town.unclaim(context[townArg], terr)
+                val result = Town.unclaim(context[townArg], terr)
+                if (result.isSuccess) {
+                    succeeded++
+                } else {
+                    Message.error(player, "Failed to remove territory ${terr.id}: ${result.exceptionOrNull()?.message}")
+                }
             }
 
-            Message.print(player, "Removed ${context[territoriesArg].size} territories from town \"${context[townArg].name}\"")
+            Message.print(player, "Removed $succeeded/${context[territoriesArg].size} territories from town \"${context[townArg].name}\"")
         }, townArg, territoriesArg)
     }
 }
@@ -377,10 +394,15 @@ class NodesAdminTownAddOfficerCommand : NodesCommand("addofficer", "nodes.admin"
         val playersArg = ArgumentResidentArray.create("player-names")
 
         addSyntax({ player, resident, context ->
-            // make residents officers
+            // make residents officers.
+            // Was unconditionally printing success -- addOfficer() returns false when the
+            // resident isn't actually a member of the town, which this used to hide.
             for (r in context[playersArg]) {
-                Town.addOfficer(context[townArg], r)
-                Message.print(player, "Made \"${r.name}\" officer of \"${context[townArg].name}\"")
+                if (Town.addOfficer(context[townArg], r)) {
+                    Message.print(player, "Made \"${r.name}\" officer of \"${context[townArg].name}\"")
+                } else {
+                    Message.error(player, "\"${r.name}\" is not a member of \"${context[townArg].name}\"")
+                }
             }
         }, townArg, playersArg)
     }
@@ -396,10 +418,13 @@ class NodesAdminTownRemoveOfficerCommand : NodesCommand("removeofficer", "nodes.
         val playersArg = ArgumentResidentArray.create("player-names")
 
         addSyntax({ player, resident, context ->
-            // make residents officers
+            // See NodesAdminTownAddOfficerCommand -- was unconditionally printing success.
             for (r in context[playersArg]) {
-                Town.removeOfficer(context[townArg], r)
-                Message.print(player, "Removed \"${r.name}\" as officer of \"${context[townArg].name}\"")
+                if (Town.removeOfficer(context[townArg], r)) {
+                    Message.print(player, "Removed \"${r.name}\" as officer of \"${context[townArg].name}\"")
+                } else {
+                    Message.error(player, "\"${r.name}\" is not a member of \"${context[townArg].name}\"")
+                }
             }
         }, townArg, playersArg)
     }
@@ -448,9 +473,11 @@ class NodesAdminTownColorCommand : NodesCommand("color", "nodes.admin") {
         }
 
         val townArg = ArgumentTown.create("town-name")
-        val rArg = ArgumentType.Integer("r")
-        val gArg = ArgumentType.Integer("g")
-        val bArg = ArgumentType.Integer("b")
+        // Was unbounded -- unlike other numeric arguments in this file (e.g. tier), these
+        // accepted any integer and persisted it verbatim into minimap/map rendering.
+        val rArg = ArgumentType.Integer("r").between(0, 255)
+        val gArg = ArgumentType.Integer("g").between(0, 255)
+        val bArg = ArgumentType.Integer("b").between(0, 255)
 
         addSyntax({ player, resident, context ->
             Town.setColor(context[townArg], context[rArg], context[gArg], context[bArg])
@@ -819,9 +846,10 @@ class NodesAdminNationColorCommand : NodesCommand("color", "nodes.admin") {
         }
 
         val nationArg = ArgumentNation.create("nation-name")
-        val rArg = ArgumentType.Integer("r")
-        val gArg = ArgumentType.Integer("g")
-        val bArg = ArgumentType.Integer("b")
+        // Was unbounded -- see NodesAdminTownColorCommand for the same finding.
+        val rArg = ArgumentType.Integer("r").between(0, 255)
+        val gArg = ArgumentType.Integer("g").between(0, 255)
+        val bArg = ArgumentType.Integer("b").between(0, 255)
 
         addSyntax({ player, resident, context ->
             Nation.setColor(context[nationArg], context[rArg], context[gArg], context[bArg])

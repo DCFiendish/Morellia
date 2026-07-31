@@ -732,7 +732,11 @@ object FlagWar {
         val startPositionInChunk: Int = (16 - size) / 2
         val x0: Int = coord.x * 16 + startPositionInChunk
         val z0: Int = coord.z * 16 + startPositionInChunk
-        val y0: Int = maxOf(flagBaseY + Nodes.config.flagBeaconSkyLevel, Nodes.config.flagBeaconMinSkyLevel)
+        // Was unclamped -- only yEnd was truncated at 255, so a flag placed high enough that
+        // y0 alone already exceeded 255 (roughly Y 206-252 depending on flagBeaconSkyLevel)
+        // produced yEnd == 255 < y0, an empty "y0..yEnd" range, and the beacon silently rendered
+        // nothing at all. Clamping y0 too guarantees a non-empty range even at the world ceiling.
+        val y0: Int = maxOf(flagBaseY + Nodes.config.flagBeaconSkyLevel, Nodes.config.flagBeaconMinSkyLevel).coerceAtMost(255)
         val xEnd: Int = x0 + size - 1
         val zEnd: Int = z0 + size - 1
         val yEnd: Int = minOf(255, y0 + size) // truncate at map limit

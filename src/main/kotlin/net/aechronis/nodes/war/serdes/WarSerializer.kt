@@ -36,21 +36,16 @@ import java.util.concurrent.Future
 
 object WarSerializer {
 
-    // pre-processed state
-
-    // occupied chunks for each territory in format:
-    // town.name -> [c0.x, c0.y, c1.x, c1.y , ... ] interleaved buffer
-    internal var occupiedChunks: HashMap<String, ArrayList<Int>> = hashMapOf()
-
-    // list of all serialized attacks as Json
-    internal val attacksJsonList: ArrayList<StringBuilder> = arrayListOf()
-
-    // pre-process war objects
+    // pre-process war objects.
+    // Was: `occupiedChunks`/`attacksJsonList` as shared mutable singleton fields, cleared and
+    // rebuilt in place on every save() call. Since save(async=true) hands writeToJson() off to
+    // CompletableFuture.runAsync, a busy war (frequent saves) could start rebuilding these same
+    // buffers here on the main thread while a previous async write was still iterating them --
+    // a genuine mutate-while-iterate race. Building fresh local buffers per call and passing them
+    // straight into writeToJson() removes the shared state entirely, so concurrent saves can no
+    // longer see or corrupt each other's in-flight buffers.
     fun save(async: Boolean) {
-        // val timePreprocess = measureNanoTime {
-
-        // convert occupiedChunks to json string
-        occupiedChunks.clear()
+        val occupiedChunks: HashMap<String, ArrayList<Int>> = hashMapOf()
 
         for (coord in FlagWar.occupiedChunks) {
             val chunk = TerritoryChunk.fromCoord(coord)
@@ -67,31 +62,38 @@ object WarSerializer {
                     chunkList.add(cx)
                     chunkList.add(cz)
                 } ?: run {
-                    WarSerializer.occupiedChunks.put(town, arrayListOf(cx, cz))
+                    occupiedChunks.put(town, arrayListOf(cx, cz))
                 }
             }
         }
 
-        // update json strings for each attack
-        attacksJsonList.clear()
+        // build json strings for each attack
+        val attacksJsonList: ArrayList<StringBuilder> = arrayListOf()
         for (attack in FlagWar.chunkToAttacker.values) {
             attacksJsonList.add(attack.toJson())
         }
 
-        // }
-
-        // println("[WAR] PRE-PROCESS TIME: ${timePreprocess.toString()}ns")
-
         if (async) {
-            // write file in worker thread
-            CompletableFuture.runAsync { writeToJson(Nodes.config.pathWar) }
+            // write file in worker thread.
+            // Was previously unguarded -- any exception thrown mid-write (e.g. a transient disk
+            // I/O error) silently dropped that entire save cycle with no log trace at all, on the
+            // one path (war state) where a lost save is worst: it means every attacker/defender
+            // flag placed since the last successful save is gone on the next restart.
+            CompletableFuture.runAsync {
+                try {
+                    writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList)
+                } catch (err: Exception) {
+                    System.err.println("[WAR] Failed to save war state: ${err.message}")
+                    err.printStackTrace()
+                }
+            }
         } else {
-            writeToJson(Nodes.config.pathWar)
+            writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList)
         }
     }
 
     // save war json file synchronously on main thread
-    fun writeToJson(path: Path) {
+    fun writeToJson(path: Path, occupiedChunks: HashMap<String, ArrayList<Int>>, attacksJsonList: ArrayList<StringBuilder>) {
         // =============================================
         // calculate string builder capacity
 
