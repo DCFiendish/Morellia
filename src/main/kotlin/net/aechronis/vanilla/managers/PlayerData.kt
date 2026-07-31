@@ -8,8 +8,10 @@ import net.minestom.server.entity.Player
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.player.PlayerDisconnectEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
+import net.minestom.server.timer.TaskSchedule
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.AbstractMap.SimpleImmutableEntry
 import java.util.concurrent.ConcurrentHashMap
 
@@ -43,6 +45,15 @@ object PlayerData {
         }
 
         MinecraftServer.getGlobalEventHandler().addChild(node)
+
+        // Previously only saved on disconnect/shutdown -- a crash or lost connection (not a clean
+        // disconnect) meant every change since the last clean save was gone.
+        MinecraftServer
+            .getSchedulerManager()
+            .buildTask(::saveAll)
+            .repeat(TaskSchedule.seconds(300))
+            .schedule()
+
         val timeEnd = System.currentTimeMillis()
         val timeLoad = timeEnd - timeStart
         println("├─ Playerdata enabled in ${timeLoad}ms")
@@ -86,14 +97,20 @@ object PlayerData {
     ) {
         val data = PlayerDataSerializer.serialize(player)
 
-        val path: Path = path.resolve("${player.uuid}.dat")
+        val target: Path = path.resolve("${player.uuid}.dat")
+        // Write to a per-writer temp file and atomically move it into place, rather than
+        // truncate-writing the real file directly -- autosave and the disconnect-save can both
+        // fire for the same player close together, and a direct write left a window where a
+        // reader (or a second concurrent writer) could see a half-written, corrupt .dat file.
+        val tmp: Path = path.resolve("${player.uuid}.dat.${Thread.currentThread().threadId()}.tmp")
 
-        Files.newOutputStream(path).use { out ->
+        Files.newOutputStream(tmp).use { out ->
             BinaryTagIO.writer().writeNamed(
                 SimpleImmutableEntry("", data),
                 out,
                 BinaryTagIO.Compression.GZIP,
             )
         }
+        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
 }

@@ -5,7 +5,6 @@ import net.aechronis.vanilla.config.FoodConfig
 import net.aechronis.vanilla.config.KothsConfig
 import net.aechronis.vanilla.config.MusicConfig
 import net.aechronis.vanilla.config.RecipesConfig
-import net.aechronis.vanilla.config.ShopConfig
 
 data class VanillaConfig(
     // Feature toggles
@@ -21,7 +20,6 @@ data class VanillaConfig(
     val blocksEnabled: Boolean = true,
     val treeFellerEnabled: Boolean = true,
     val foodEnabled: Boolean = true,
-    val shopEnabled: Boolean = true,
     val itemsEnabled: Boolean = true,
     val bundlesEnabled: Boolean = true,
     val blockDropsEnabled: Boolean = true,
@@ -43,8 +41,6 @@ data class VanillaConfig(
     val blocksConfig: BlocksConfig = BlocksConfig(),
     // Food
     val foodConfig: FoodConfig = FoodConfig(),
-    // Shop
-    val shopConfig: ShopConfig = ShopConfig(),
     // Music
     val musicConfig: MusicConfig = MusicConfig(),
     // Recipes

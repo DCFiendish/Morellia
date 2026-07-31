@@ -1,7 +1,6 @@
 package net.aechronis.vanilla.serdes
 
 import net.aechronis.vanilla.managers.Commands
-import net.aechronis.vanilla.managers.KillShop
 import net.kyori.adventure.nbt.BinaryTagTypes
 import net.kyori.adventure.nbt.CompoundBinaryTag
 import net.kyori.adventure.nbt.ListBinaryTag
@@ -18,7 +17,6 @@ object PlayerDataSerializer {
                 .putFloat("Health", player.getHealth())
                 .putInt("Food", player.food)
                 .putFloat("FoodSaturation", player.foodSaturation)
-                .putInt("Points", player.getTag(KillShop.POINTS_TAG) ?: 0)
                 .putString("GameMode", player.gameMode.name)
                 .putBoolean("AllowFlying", player.isAllowFlying)
                 .putBoolean("Flying", player.isFlying)

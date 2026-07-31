@@ -2,7 +2,9 @@ package net.aechronis.vanilla.listeners
 
 import net.aechronis.vanilla.Vanilla
 import net.minestom.server.entity.GameMode
+import net.minestom.server.entity.Player
 import net.minestom.server.entity.damage.DamageType
+import net.minestom.server.event.entity.EntityTeleportEvent
 import net.minestom.server.event.player.PlayerDeathEvent
 import net.minestom.server.event.player.PlayerDisconnectEvent
 import net.minestom.server.event.player.PlayerMoveEvent
@@ -60,9 +62,18 @@ object FallDamageListener {
         fallStartY.remove(event.player.uuid)
     }
 
+    fun onTeleport(event: EntityTeleportEvent) {
+        // Without this, a fall tracked before a teleport (e.g. /tp, warp, elevator) keeps its old
+        // startY, so landing after the teleport computes fall damage against a location the player
+        // was never actually falling from.
+        val player = event.entity as? Player ?: return
+        fallStartY.remove(player.uuid)
+    }
+
     fun init() {
         Vanilla.eventNode.addListener(PlayerMoveEvent::class.java, FallDamageListener::onMove)
         Vanilla.eventNode.addListener(PlayerDeathEvent::class.java, FallDamageListener::onDeath)
         Vanilla.eventNode.addListener(PlayerDisconnectEvent::class.java, FallDamageListener::onDisconnect)
+        Vanilla.eventNode.addListener(EntityTeleportEvent::class.java, FallDamageListener::onTeleport)
     }
 }

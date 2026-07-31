@@ -54,13 +54,18 @@ object EnvironmentalDamage {
     }
 
     private fun tickFire(player: Player) {
-        if (isInWaterOrBubbleColumn(player)) {
+        // Runs for every online player every tick, so avoid computing the occupied-block set
+        // twice (isInWaterOrBubbleColumn + isInFire each used to walk the bounding box and call
+        // instance.getBlock() independently) -- compute it once and reuse it for both checks.
+        val occupied = blocksOccupiedBy(player).toList()
+
+        if (occupied.any { it === Block.WATER || it === Block.BUBBLE_COLUMN }) {
             player.fireTicks = 0
             fireContactTicks.remove(player.uuid)
             return
         }
 
-        if (isInFire(player)) {
+        if (occupied.any { it === Block.FIRE || it === Block.SOUL_FIRE }) {
             player.fireTicks = maxOf(player.fireTicks, Vanilla.config.fireTicks)
             if (player.hasEffect(PotionEffect.FIRE_RESISTANCE)) {
                 fireContactTicks.remove(player.uuid)
@@ -97,11 +102,6 @@ object EnvironmentalDamage {
             metadata.airTicks = airTicks
         }
     }
-
-    private fun isInFire(player: Player): Boolean = blocksOccupiedBy(player).any { it === Block.FIRE || it === Block.SOUL_FIRE }
-
-    private fun isInWaterOrBubbleColumn(player: Player): Boolean =
-        blocksOccupiedBy(player).any { it === Block.WATER || it === Block.BUBBLE_COLUMN }
 
     private fun isEyeInWater(player: Player): Boolean {
         val instance = player.instance ?: return false

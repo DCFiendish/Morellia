@@ -18,7 +18,6 @@ import net.aechronis.vanilla.commands.List
 import net.aechronis.vanilla.commands.Message
 import net.aechronis.vanilla.commands.Music
 import net.aechronis.vanilla.commands.Reply
-import net.aechronis.vanilla.commands.Shop
 import net.aechronis.vanilla.commands.Teleport
 import net.aechronis.vanilla.commands.Whitelist
 import net.aechronis.vanilla.listeners.CommandsListener
@@ -33,7 +32,6 @@ import net.aechronis.vanilla.managers.Elevator
 import net.aechronis.vanilla.managers.EnvironmentalDamage
 import net.aechronis.vanilla.managers.Food
 import net.aechronis.vanilla.managers.Items
-import net.aechronis.vanilla.managers.KillShop
 import net.aechronis.vanilla.managers.Koth
 import net.aechronis.vanilla.managers.Mannequin
 import net.aechronis.vanilla.managers.PlayerData
@@ -81,7 +79,6 @@ object Vanilla {
             if (config.musicEnabled) commands += Music()
             if (config.blocksEnabled) commands += Convert()
             if (config.recipesEnabled) commands += Craft()
-            if (config.shopEnabled) commands += Shop()
             if (config.whitelistEnabled) commands += Whitelist()
             if (config.kothEnabled) commands += KothCommand()
             MinecraftServer.getCommandManager().register(*commands.toTypedArray())
@@ -98,7 +95,6 @@ object Vanilla {
         if (config.blocksEnabled) Blocks.init()
         if (config.treeFellerEnabled) TreeFeller.init()
         if (config.foodEnabled) Food.init()
-        if (config.shopEnabled) KillShop.init()
         if (config.itemsEnabled) Items.init()
         if (config.bundlesEnabled) Bundles.init()
         if (config.commandsEnabled) CommandsListener.init()

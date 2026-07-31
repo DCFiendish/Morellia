@@ -16,6 +16,7 @@ import net.minestom.server.instance.Instance
 import net.minestom.server.instance.block.Block
 import net.minestom.server.instance.block.BlockHandler
 import net.minestom.server.inventory.Inventory
+import net.minestom.server.timer.TaskSchedule
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -41,6 +42,14 @@ object Storage {
             blockManager.registerHandler(barrelKey) { defaultBarrelHandler }
         }
         StorageListener.init()
+
+        // Barrels already persist on inventory close, but that only covers barrels a player
+        // actually opened and closed cleanly -- this is a periodic safety net for the rest.
+        MinecraftServer
+            .getSchedulerManager()
+            .buildTask(::saveAll)
+            .repeat(TaskSchedule.seconds(300))
+            .schedule()
 
         val timeEnd = System.currentTimeMillis()
         val timeLoad = timeEnd - timeStart
