@@ -854,8 +854,11 @@ class NodesAdminBuildingCreateCommand : NodesCommand("create", "nodes.admin") {
         val tierArg = ArgumentType.Integer("tier").between(1, 3)
 
         addSyntax({ player, resident, context ->
+            // Was bare `name` here, which resolves to this command object's own Minestom
+            // Command name ("create") rather than the typed argument -- every port ended up
+            // named "create", and only the first one could ever succeed (name collision).
             Port.create(
-                name,
+                context[nameArg],
                 Math.floorDiv(player.position.blockX(), 16),
                 Math.floorDiv(player.position.blockZ(), 16),
                 context[tierArg],
@@ -864,7 +867,7 @@ class NodesAdminBuildingCreateCommand : NodesCommand("create", "nodes.admin") {
                 Message.error(player, "Failed to create port: ${err.message}")
                 return@addSyntax
             }
-            Message.print(player, "Created port \"$name\" (tier ${context[tierArg]})")
+            Message.print(player, "Created port \"${context[nameArg]}\" (tier ${context[tierArg]})")
         }, portLit, nameArg, publicArg, tierArg)
 
         addSyntax({ player, resident, context ->
@@ -876,7 +879,9 @@ class NodesAdminBuildingCreateCommand : NodesCommand("create", "nodes.admin") {
                 Message.error(player, "Failed to create farm: ${err.message}")
                 return@addSyntax
             }
-            Message.print(player, "Created farm (tier $context[tierArg])")
+            // Was "$context[tierArg]" (no braces) -- interpolated context.toString() followed by
+            // the literal text "[tierArg]" instead of the actual tier value.
+            Message.print(player, "Created farm (tier ${context[tierArg]})")
         }, farmLit, tierArg)
     }
 }

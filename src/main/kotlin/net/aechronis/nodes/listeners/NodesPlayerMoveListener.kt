@@ -118,7 +118,15 @@ object NodesPlayerMoveListener {
 
         // if player leaves their own town while flying, disable flight
         if (player.isAllowFlying && toTerritory?.town != playerTown) {
+            // isAllowFlying alone only clears the "may fly" ability bit; Minestom's Player also
+            // tracks a separate "flying" bit that isAllowFlying never touches, and both bits
+            // get sent together in the same abilities packet. Leaving it set meant the client
+            // kept flying right through the Slow Falling window below, only landing (and taking
+            // full fall damage) well after it had already expired. setFlying(false) clears the
+            // actual flying state too, so the player is really grounded here, not just no
+            // longer permitted to re-enter flight.
             player.isAllowFlying = false
+            player.isFlying = false
             // give player slow falling to avoid fall damage
             player.addEffect(Potion(PotionEffect.SLOW_FALLING, 0, 100))
             Message.print(player, "You are no longer in your town, disabling flight")

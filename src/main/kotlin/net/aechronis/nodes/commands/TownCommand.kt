@@ -982,7 +982,10 @@ class TownFlyCommand : NodesCommand("fly") {
             }
 
             if (player.isAllowFlying) {
+                // See NodesPlayerMoveListener's auto-disable for why both bits are needed --
+                // isAllowFlying alone leaves the client still actually flying.
                 player.isAllowFlying = false
+                player.isFlying = false
                 // give player slow falling to avoid fall damage
                 player.addEffect(Potion(PotionEffect.SLOW_FALLING, 0, 100))
                 Message.print(player, "Disabled flight")
