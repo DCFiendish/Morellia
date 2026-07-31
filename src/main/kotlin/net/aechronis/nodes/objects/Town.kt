@@ -431,6 +431,11 @@ class Town(
 
         internal fun showProtectedChests(town: Town, resident: Resident) {
             val player = resident.player() ?: return
+            // Was creating a new independent repeating task on every call with no dedup/cooldown
+            // -- spamming "/town protect show" stacked N overlapping tasks, each iterating the
+            // entire protected-blocks set every second for ~10 seconds. Cancel any still-running
+            // task for this resident first so there's at most one in flight.
+            resident.protectShowTask?.cancel()
             val particle = Particle.HAPPY_VILLAGER
             val offset = Vec(0.1, 0.1, 0.1)
             var runs = 0
@@ -450,8 +455,12 @@ class Town(
                     player.sendPackets(*locations.map { ParticlePacket(particle, it, offset, 0F, 3) }.toTypedArray())
                 }
                 runs += 1
-                if (runs > 10) task?.cancel()
+                if (runs > 10) {
+                    task?.cancel()
+                    if (resident.protectShowTask === task) resident.protectShowTask = null
+                }
             }.delay(TaskSchedule.millis(1000)).repeat(TaskSchedule.millis(1000)).schedule()
+            resident.protectShowTask = task
         }
 
         internal fun onIncomeInventoryClose() {

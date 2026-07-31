@@ -197,6 +197,9 @@ class Resident(val uuid: UUID, val name: String) {
     var plotCornerTwo: Plot.BlockVec3? = null
     var plotParticleTask: Task? = null
 
+    // active /town protect show particle-broadcast task, if any -- see Town.showProtectedChests
+    var protectShowTask: Task? = null
+
     fun clearPlotSelection() {
         plotCornerOne = null
         plotCornerTwo = null
