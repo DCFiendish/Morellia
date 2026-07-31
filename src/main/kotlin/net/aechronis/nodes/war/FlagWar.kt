@@ -57,6 +57,7 @@ import net.minestom.server.timer.TaskSchedule
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 private val SKY_BEACON_FRAME_BLOCK = Block.SEA_LANTERN
 private val SKY_BEACON_BLOCK = Block.BLACK_WOOL
@@ -95,13 +96,17 @@ object FlagWar {
     internal var skyBeaconSize: Int = 6
 
     // map attacker UUID -> List of Attack instances
-    internal val attackers: HashMap<UUID, ArrayList<Attack>> = hashMapOf()
+    // Both maps below were plain HashMap/ArrayList while chunkToAttacker (same lifecycle, same
+    // call sites) was already ConcurrentHashMap -- flag place/break events dispatch per-chunk on
+    // Minestom's chunk-owner threads, not a single global thread, so two attacks starting or
+    // ending in different chunks at the same moment could mutate these concurrently.
+    internal val attackers: ConcurrentHashMap<UUID, CopyOnWriteArrayList<Attack>> = ConcurrentHashMap()
 
     // map chunk -> Attack instance
     internal val chunkToAttacker: ConcurrentHashMap<Coord, Attack> = ConcurrentHashMap()
 
     // map flag block -> Attack instance (for cancelling attacks)
-    internal val blockToAttacker: HashMap<BlockVec, Attack> = hashMapOf()
+    internal val blockToAttacker: ConcurrentHashMap<BlockVec, Attack> = ConcurrentHashMap()
 
     // set of all occupied chunks
     internal val occupiedChunks: MutableSet<Coord> = ConcurrentHashMap.newKeySet() // create concurrent set from ConcurrentHashMap
@@ -383,7 +388,7 @@ object FlagWar {
             // attacker's current attacks (if any exist)
             var currentAttacks = attackers.get(attacker)
             if (currentAttacks == null) {
-                currentAttacks = ArrayList(Nodes.config.maxPlayerChunkAttacks) // set initial capacity = max attacks
+                currentAttacks = CopyOnWriteArrayList()
                 attackers.put(attacker, currentAttacks)
             } else if (currentAttacks.size >= Nodes.config.maxPlayerChunkAttacks) {
                 return Result.failure(ErrorTooManyAttacks)
@@ -502,7 +507,7 @@ object FlagWar {
         // add attack to list of attacks by attacker
         var currentAttacks = attackers.get(attacker)
         if (currentAttacks == null) {
-            currentAttacks = ArrayList(Nodes.config.maxPlayerChunkAttacks) // set initial capacity = max attacks
+            currentAttacks = CopyOnWriteArrayList()
             attackers.put(attacker, currentAttacks)
         }
         currentAttacks.add(attack)

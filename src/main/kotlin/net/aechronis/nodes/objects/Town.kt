@@ -22,6 +22,7 @@ import net.aechronis.nodes.utils.EnumArrayMap
 import net.aechronis.nodes.utils.createEnumArrayMap
 import net.aechronis.nodes.utils.stringArrayFromSet
 import net.aechronis.nodes.utils.stringMapFromMap
+import net.aechronis.nodes.war.FlagWar
 import net.minestom.server.MinecraftServer
 import net.minestom.server.command.CommandSender
 import net.minestom.server.coordinate.BlockVec
@@ -187,6 +188,25 @@ class Town(
             if (nation != null) {
                 if (nation.towns.size == 1) Nation.destroy(nation) else Nation.removeTown(nation, town)
             }
+
+            // Cancel any in-progress war attacks involving this town before it's torn down --
+            // previously untouched, so an attack could finish afterward and either capture
+            // territory for a Town object no longer reachable via Nodes.towns (attacks launched
+            // by this town), or run its capture/liberate logic against a territory whose .town
+            // was already nulled out below (attacks targeting this town's own territories).
+            if (FlagWar.enabled) {
+                for (attack in FlagWar.chunkToAttacker.values.toList()) {
+                    if (attack.town === town) attack.cancel()
+                }
+                town.territories.forEach { id ->
+                    val territory = Territory.fromId(id) ?: return@forEach
+                    for (coord in territory.chunks) {
+                        val attack = FlagWar.chunkToAttacker[coord]
+                        if (attack !== null && attack.town !== town) attack.cancel()
+                    }
+                }
+            }
+
             town.territories.forEach { Territory.fromId(it)?.town = null }
             town.captured.forEach { Territory.fromId(it)?.occupier = null }
             town.residents.forEach { resident ->

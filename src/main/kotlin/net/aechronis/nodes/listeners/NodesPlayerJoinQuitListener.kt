@@ -93,7 +93,9 @@ object NodesPlayerJoinQuitListener {
         if (FlagWar.enabled) {
             val attacks = FlagWar.attackers[player.uuid]
             if (attacks !== null) {
-                for (a in attacks) {
+                // a.cancel() -> FlagWar.cancelAttack() removes the attack from this same list,
+                // so iterating the live list directly threw ConcurrentModificationException.
+                for (a in attacks.toList()) {
                     a.cancel()
                 }
             }

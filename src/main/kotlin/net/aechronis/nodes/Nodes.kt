@@ -71,7 +71,12 @@ object Nodes {
 
     internal val resourceNodes: HashMap<String, ResourceNode> = hashMapOf()
     internal val territoryChunks: ConcurrentHashMap<Coord, TerritoryChunk> = ConcurrentHashMap()
-    internal val territories: HashMap<TerritoryId, Territory> = hashMapOf()
+
+    // Was a plain HashMap while territoryChunks (identical lifecycle: read on every chunk/block
+    // lookup, written only on territory load/reload) was already ConcurrentHashMap -- Territory
+    // lookups happen from Minestom's per-chunk worker threads, not one global thread, so this was
+    // a real concurrent read/write hazard on every territory reload.
+    internal val territories: ConcurrentHashMap<TerritoryId, Territory> = ConcurrentHashMap()
     internal val towns: LinkedHashMap<String, Town> = LinkedHashMap()
     internal val nations: LinkedHashMap<String, Nation> = LinkedHashMap()
     internal val residents: LinkedHashMap<UUID, Resident> = LinkedHashMap()
@@ -82,7 +87,7 @@ object Nodes {
     internal var lastBackupTime: Long = 0
     val war = FlagWar
     internal var needsSave: Boolean = false
-    internal val hiddenOreInvalidBlocks: OreBlockCache = OreBlockCache(2000)
+    internal val hiddenOreInvalidBlocks: OreBlockCache = OreBlockCache()
     lateinit var config: NodesConfig
 
     fun initialize(config: NodesConfig = NodesConfig()) {

@@ -78,7 +78,7 @@ object Nametag {
      * Update nametag text for player
      * Sends team packets directly to the player so they see customized prefixes
      */
-    private fun updateTextForPlayer(player: Player) {
+    private fun updateTextForPlayer(player: Player, membersByTown: Map<Town, List<String>>) {
         // remove all existing town teams for this viewer
         for (town in Nodes.towns.values) {
             val teamName = "t${town.townNametagId}"
@@ -89,15 +89,7 @@ object Nametag {
         for (town in Nodes.towns.values) {
             val teamName = "t${town.townNametagId}"
             val prefix = townNametagViewedByPlayer(town, player, space = true)
-
-            // collect all players in this town to add to the team
-            val townMembers = mutableListOf<String>()
-            for (otherPlayer in MinecraftServer.getConnectionManager().onlinePlayers) {
-                val otherTown = Town.fromPlayer(otherPlayer)
-                if (otherTown === town) {
-                    townMembers.add(otherPlayer.username)
-                }
-            }
+            val townMembers = membersByTown[town] ?: emptyList()
 
             // create team with customized prefix for this viewer
             val createAction = TeamsPacket.CreateTeamAction(
@@ -122,8 +114,19 @@ object Nametag {
      */
     private fun updateAllText() {
         val onlinePlayers = MinecraftServer.getConnectionManager().onlinePlayers
+
+        // Town membership doesn't depend on the viewer, but used to get rebuilt by scanning every
+        // online player for every (viewer x town) pair -- O(players^2 x towns) every single call
+        // of this once-a-second task. Build it once per call instead: O(players) to bucket, then
+        // O(players x towns) to send packets, no repeated inner scan.
+        val membersByTown = mutableMapOf<Town, MutableList<String>>()
         for (player in onlinePlayers) {
-            updateTextForPlayer(player)
+            val town = Town.fromPlayer(player) ?: continue
+            membersByTown.getOrPut(town) { mutableListOf() }.add(player.username)
+        }
+
+        for (player in onlinePlayers) {
+            updateTextForPlayer(player, membersByTown)
         }
     }
 }

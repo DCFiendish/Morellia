@@ -6,8 +6,6 @@
  * Object is wrapper around hashset, client should only add
  * blocks into cache (removing handled internally), and use
  * contains to check if block exists
- *
- * Size input: number of blocks to cache before overwriting
  */
 
 package net.aechronis.nodes.objects
@@ -17,12 +15,16 @@ import net.minestom.server.coordinate.BlockVec
 import java.io.FileReader
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
-class OreBlockCache(val maxSize: Int) {
-    private val cache: MutableSet<BlockVec> = Collections.newSetFromMap(object : LinkedHashMap<BlockVec, Boolean>() {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<BlockVec, Boolean>): Boolean = this.size > maxSize
-    })
+class OreBlockCache {
+    // Used to be a fixed-size LRU (LinkedHashMap + removeEldestEntry) capped at 2000 entries.
+    // This set records positions that must never trigger hidden ore again -- once a real server
+    // exceeds the cap (any sustained mining does, quickly), the oldest entries silently evict and
+    // those exact positions become farmable again via place-then-rebreak. Correctness here
+    // requires the ledger to never forget, so there's no cap; ConcurrentHashMap.newKeySet() also
+    // makes add()/contains() safe from the per-chunk worker threads block break/place events fire on.
+    private val cache: MutableSet<BlockVec> = ConcurrentHashMap.newKeySet()
 
     fun add(block: BlockVec) {
         this.cache.add(block)
@@ -30,9 +32,9 @@ class OreBlockCache(val maxSize: Int) {
 
     fun contains(block: BlockVec): Boolean = cache.contains(block)
 
-    // Was entirely in-memory: a restart, or just hitting maxSize once, silently forgot which
-    // blocks had already been mined and reopened the place-then-rebreak ore dupe. Persisting
-    // this alongside the rest of Nodes' world state closes that gap.
+    // Was entirely in-memory: a restart silently forgot which blocks had already been mined and
+    // reopened the place-then-rebreak ore dupe. Persisting this alongside the rest of Nodes'
+    // world state closes that gap.
     fun save(path: Path) {
         val json = StringBuilder("[")
         for ((i, block) in cache.withIndex()) {

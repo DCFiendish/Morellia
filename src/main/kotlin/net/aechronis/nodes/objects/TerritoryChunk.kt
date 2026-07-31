@@ -19,8 +19,10 @@ data class TerritoryChunk(
     val territory: Territory,
 
     // flags for war
-    var attacker: Town? = null, // town currently attacking chunk
-    var occupier: Town? = null, // town occupying chunk
+    // @Volatile: same cross-thread visibility concern as Territory.town/occupier -- these are
+    // written from whichever chunk-owner thread an attack resolves on.
+    @Volatile var attacker: Town? = null, // town currently attacking chunk
+    @Volatile var occupier: Town? = null, // town occupying chunk
 ) {
     companion object {
         fun fromBlock(blockX: Int, blockZ: Int): TerritoryChunk? = fromCoord(Coord.fromBlockCoords(blockX, blockZ))

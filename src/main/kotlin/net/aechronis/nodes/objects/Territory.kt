@@ -313,8 +313,11 @@ data class Territory(
     val attackerTimeMultiplier: Double,
     val defenderTimeMultiplier: Double,
     // mutable properties: TODO find way to get rid?
-    var town: Town? = null, // town owner
-    var occupier: Town? = null, // town occupier (after being captured in war)
+    // @Volatile: read from and written on Minestom's per-chunk worker threads (block
+    // breaks, war attacks resolving on whichever thread owns that chunk), not one global thread --
+    // without it, a write on one thread isn't guaranteed to be visible to a read on another.
+    @Volatile var town: Town? = null, // town owner
+    @Volatile var occupier: Town? = null, // town occupier (after being captured in war)
 ) {
     companion object {
         fun count(): Int = Nodes.territories.size
