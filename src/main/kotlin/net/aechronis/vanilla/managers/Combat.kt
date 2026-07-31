@@ -59,19 +59,22 @@ object Combat {
         val durationMs = Vanilla.config.combatDurationSeconds * 1000
 
         for ((uuid, expiry) in expiresAt) {
-            val player =
-                MinecraftServer
-                    .getConnectionManager()
-                    .onlinePlayers
-                    .firstOrNull { it.uuid == uuid } ?: continue
+            // Was an O(n) linear scan of every online player per tagged player, every tick
+            // interval -- getOnlinePlayerByUuid is the O(1) direct lookup ConnectionManager
+            // already provides (used elsewhere in this codebase, e.g. Resident.fromPlayer).
+            val player = MinecraftServer.getConnectionManager().getOnlinePlayerByUuid(uuid) ?: continue
             val bar = bossBars[uuid] ?: continue
             val remaining = expiry - now
 
             if (remaining <= 0) {
                 expiresAt.remove(uuid)
                 bossBars.remove(uuid)
-                player.hideBossBar(bar)
-                player.sendMessage(Component.text("You have left combat", NamedTextColor.GREEN))
+                // Defer the actual player-facing mutation onto that player's own tick thread --
+                // see EnvironmentalDamage.kt's tick() for the same fix and why.
+                player.scheduler().scheduleNextTick {
+                    player.hideBossBar(bar)
+                    player.sendMessage(Component.text("You have left combat", NamedTextColor.GREEN))
+                }
                 continue
             }
 

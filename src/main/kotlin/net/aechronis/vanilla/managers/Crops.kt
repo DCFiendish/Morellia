@@ -36,28 +36,32 @@ object Crops {
 
     private fun growthTick() {
         val now = System.currentTimeMillis()
-        val toRemove = mutableListOf<BlockKey>()
         for ((key, planted) in crops) {
             val mps = msPerState[planted.cropType] ?: continue
             val targetAge =
                 (planted.initialAge + ((now - planted.plantedAt) / mps).toInt())
                     .coerceAtMost(planted.cropType.maxAge)
-            val currentBlock = key.instance.getBlock(key.pos)
-            if (!currentBlock.compare(planted.cropType.cropBlock)) {
-                toRemove.add(key)
-                continue
-            }
-            val currentAge = currentBlock.getProperty("age")?.toIntOrNull() ?: 0
-            if (targetAge <= currentAge) continue
-            val newBlock = planted.cropType.cropBlock.withProperty("age", targetAge.toString())
-            key.instance.setBlock(key.pos, newBlock)
-            val blockPos = BlockVec(key.pos.x().toInt(), key.pos.y().toInt(), key.pos.z().toInt())
-            val chunk = key.instance.getChunkAt(key.pos)
-            chunk?.sendPacketToViewers(BlockChangePacket(blockPos, newBlock.stateId()))
-            if (targetAge == planted.cropType.maxAge) {
-                toRemove.add(key)
+            // growthTick() runs on the global scheduler thread (MinecraftServer.getSchedulerManager()),
+            // which per Minestom's own threading docs has no synchronization guarantee for touching
+            // chunk/block state directly -- only per-entity/per-chunk event handlers get that for free.
+            // Defer the actual block read+mutation onto the owning instance's own tick thread.
+            key.instance.scheduleNextTick {
+                val currentBlock = key.instance.getBlock(key.pos)
+                if (!currentBlock.compare(planted.cropType.cropBlock)) {
+                    crops.remove(key)
+                    return@scheduleNextTick
+                }
+                val currentAge = currentBlock.getProperty("age")?.toIntOrNull() ?: 0
+                if (targetAge <= currentAge) return@scheduleNextTick
+                val newBlock = planted.cropType.cropBlock.withProperty("age", targetAge.toString())
+                key.instance.setBlock(key.pos, newBlock)
+                val blockPos = BlockVec(key.pos.x().toInt(), key.pos.y().toInt(), key.pos.z().toInt())
+                val chunk = key.instance.getChunkAt(key.pos)
+                chunk?.sendPacketToViewers(BlockChangePacket(blockPos, newBlock.stateId()))
+                if (targetAge == planted.cropType.maxAge) {
+                    crops.remove(key)
+                }
             }
         }
-        toRemove.forEach { crops.remove(it) }
     }
 }

@@ -64,10 +64,15 @@ object Food {
 
     private fun tick() {
         val config = Vanilla.config
+        // See EnvironmentalDamage.kt's tick() -- same off-thread player-mutation fix, same
+        // reason: the global scheduler thread has no synchronization guarantee for touching a
+        // player's own health/food/saturation directly.
         for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
             if (player.gameMode == GameMode.CREATIVE || player.gameMode == GameMode.SPECTATOR) continue
-            applyHealing(player, config.foodConfig.foodHealAmount, config.foodConfig.foodHealSaturationCost)
-            applyStarvation(player, config.foodConfig.foodStarvationDamage)
+            player.scheduler().scheduleNextTick {
+                applyHealing(player, config.foodConfig.foodHealAmount, config.foodConfig.foodHealSaturationCost)
+                applyStarvation(player, config.foodConfig.foodStarvationDamage)
+            }
         }
     }
 

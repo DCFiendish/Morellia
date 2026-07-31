@@ -33,8 +33,14 @@ object EnvironmentalDamage {
     }
 
     private fun tick() {
+        // This ran every single tick directly on the global scheduler thread, touching each
+        // player's own fireTicks/health/airTicks and reading blocks around them -- none of that
+        // is covered by Minestom's per-entity tick-thread synchronization guarantee unless it
+        // goes through that entity's own scheduler. Dispatching per-player also spreads the work
+        // across Minestom's per-chunk worker threads instead of serializing all players through
+        // one scheduler thread every tick.
         for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
-            tickPlayer(player)
+            player.scheduler().scheduleNextTick { tickPlayer(player) }
         }
     }
 

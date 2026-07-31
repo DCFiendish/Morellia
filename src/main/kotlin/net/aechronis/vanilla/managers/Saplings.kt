@@ -37,20 +37,24 @@ object Saplings {
 
     private fun growthTick() {
         val now = System.currentTimeMillis()
-        val toRemove = mutableListOf<BlockKey>()
         for ((key, planted) in saplings) {
-            if (!key.instance.getBlock(key.pos).compare(planted.type.saplingBlock)) {
-                toRemove.add(key)
-                continue
+            // See Crops.kt's growthTick() -- same off-thread-mutation fix, same reason. grow()/
+            // tryGiant() are also called synchronously from SaplingsListener's bone-meal handler,
+            // where they're already on the correct instance thread via the triggering event, so
+            // only this scheduler-driven call path needs the defer.
+            key.instance.scheduleNextTick {
+                if (!key.instance.getBlock(key.pos).compare(planted.type.saplingBlock)) {
+                    saplings.remove(key)
+                    return@scheduleNextTick
+                }
+                if (now - planted.plantedAt < Vanilla.config.saplingGrowthMs) return@scheduleNextTick
+                if (planted.type.giant && tryGiant(key.instance, key.pos, planted.type)) {
+                    saplings.remove(key)
+                    return@scheduleNextTick
+                }
+                if (grow(key, planted)) saplings.remove(key)
             }
-            if (now - planted.plantedAt < Vanilla.config.saplingGrowthMs) continue
-            if (planted.type.giant && tryGiant(key.instance, key.pos, planted.type)) {
-                toRemove.add(key)
-                continue
-            }
-            if (grow(key, planted)) toRemove.add(key)
         }
-        toRemove.forEach { saplings.remove(it) }
     }
 
     fun tryGiant(
