@@ -361,14 +361,21 @@ class TownAcceptCommand : NodesCommand("accept") {
                     return@addSyntax
                 }
 
+                // The applicant may have already joined a different town (e.g. accepted
+                // elsewhere, or via multiple pending applications) since applying here -- remove
+                // the now-stale application either way, but only announce success if they
+                // actually weren't already in a town.
+                town.applications.remove(applicant)
+                if (!Town.addResident(town, applicant)) {
+                    Message.error(player, "${applicant.name} already joined another town")
+                    return@addSyntax
+                }
+
                 Message.print(player, "${applicant.name} has been accepted into your town!")
                 val applicantPlayer = MinecraftServer.getConnectionManager().getOnlinePlayerByUsername(applicant.name)
                 if (applicantPlayer != null) {
                     Message.print(applicantPlayer, "You have been accepted into ${town.name}!")
                 }
-
-                Town.addResident(town, applicant)
-                town.applications.remove(applicant)
             }
         })
 
@@ -415,14 +422,18 @@ class TownAcceptCommand : NodesCommand("accept") {
                     }
                 }
 
+                // See the other accept syntax above -- applicant may already be in a town by now.
+                town.applications.remove(applicant)
+                if (!Town.addResident(town, applicant)) {
+                    Message.error(player, "${applicant.name} already joined another town")
+                    return@addSyntax
+                }
+
                 Message.print(player, "${applicant.name} has been accepted into your town!")
                 val applicantPlayer = MinecraftServer.getConnectionManager().getOnlinePlayerByUsername(applicant.name)
                 if (applicantPlayer != null) {
                     Message.print(applicantPlayer, "You have been accepted into ${town.name}!")
                 }
-
-                Town.addResident(town, applicant)
-                town.applications.remove(applicant)
             }
         }, playerArg)
     }

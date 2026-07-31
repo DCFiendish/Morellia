@@ -257,8 +257,14 @@ class NodesAdminTownAddPlayerCommand : NodesCommand("addplayer", "nodes.admin") 
 
         addSyntax({ player, resident, context ->
             for (resident in context[playersArg]) {
-                Town.addResident(context[townArg], resident)
-                Message.print(player, "Added \"${resident.name}\" to town \"${context[townArg].name}\"")
+                // addResident() now refuses to double-add a resident who already has a town, to
+                // stop the previous silent dual-membership corruption -- surface that as a
+                // proper error here instead of just claiming success either way.
+                if (Town.addResident(context[townArg], resident)) {
+                    Message.print(player, "Added \"${resident.name}\" to town \"${context[townArg].name}\"")
+                } else {
+                    Message.error(player, "\"${resident.name}\" is already in a town")
+                }
             }
         }, townArg, playersArg)
     }

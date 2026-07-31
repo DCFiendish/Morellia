@@ -204,6 +204,10 @@ data class NodesConfig(
     val pathBuildings: Path get() = Paths.get(path, "buildings.json").normalize()
     val pathLastBackupTime: Path get() = Paths.get(path, "lastBackupTime.txt").normalize()
 
+    // persists Nodes.hiddenOreInvalidBlocks (already-mined blocks, tracked to stop the
+    // place-then-rebreak ore dupe) across restarts -- previously memory-only, see OreBlockCache.kt
+    val pathOreCache: Path get() = Paths.get(path, "ore_cache.json").normalize()
+
     // use whitelist/blacklist for war (derived from list.size > 0 for lists below)
     val warUseWhitelist: Boolean get() = warWhitelist.isNotEmpty()
     val warUseBlacklist: Boolean get() = warBlacklist.isNotEmpty()

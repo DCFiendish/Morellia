@@ -268,7 +268,19 @@ class Town(
             return true
         }
 
-        fun addResident(town: Town, resident: Resident) {
+        // Was previously unguarded: none of the call sites checked resident.town first (the
+        // admin /nodesadmin town addplayer command still doesn't, and a player who applied to
+        // two towns could get accepted by both), so a resident could end up added to a second
+        // town's residents set while still also listed in their first town's -- resident.town
+        // only points at one of them, leaving the other with a dangling reference to a member
+        // who's no longer really theirs. Returns false instead of silently corrupting state so
+        // callers can tell the requester it didn't happen.
+        fun addResident(
+            town: Town,
+            resident: Resident,
+        ): Boolean {
+            if (resident.town != null) return false
+
             town.residents.add(resident)
             resident.town = town
             resident.trusted = false
@@ -282,6 +294,7 @@ class Town(
             resident.needsUpdate()
             resident.minimap?.refresh()
             Nodes.needsSave = true
+            return true
         }
 
         fun removeResident(town: Town, resident: Resident) {

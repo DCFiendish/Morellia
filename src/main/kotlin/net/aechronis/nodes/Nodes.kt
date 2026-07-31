@@ -215,7 +215,11 @@ object Nodes {
         toBuild.forEach { data ->
             if (!data.chunks.contains(data.core)) {
                 println("[Nodes] Territory ${data.id} chunk does not contain core")
-                return
+                // Was a bare `return`, which in Kotlin is a non-local return from the whole
+                // loadTerritories() function, not just this forEach iteration -- one malformed
+                // territory silently aborted loading of every territory after it. return@forEach
+                // skips only this one and lets the rest still load.
+                return@forEach
             }
             val resources = graph[data.id]!!.applyNeighborModifiers()
             val names = data.resourceNodes.sortedBy { resourceNodes[it]!!.priority }
@@ -233,6 +237,16 @@ object Nodes {
     internal fun loadWorld(): Boolean {
         residents.values.forEach { it.destroyMinimap() }
 
+        // Previously no catch at all: a parse failure partway through (e.g. malformed
+        // towns.json) threw straight past the clears above with towns/nations/residents left
+        // half-wiped, half-reloaded -- and nothing here stopped the next scheduled autosave from
+        // persisting that partial state over the last good save. The `/nodesadmin load` command
+        // also called this with no try/catch of its own, so a bad reload there had no clean
+        // failure path either. Catching here can't undo the clears that already ran (a fully
+        // atomic reload would need the deserializers to build into fresh structures and swap
+        // them in only on success -- a bigger change than this fix), but it does stop a broken
+        // in-memory state from silently overwriting disk on the next autosave, and gives a clear
+        // error instead of an uncaught exception.
         try {
             resourceNodes.clear()
             territoryChunks.clear()
@@ -250,6 +264,7 @@ object Nodes {
             val (resources, territoriesJson) = Deserializer.worldFromJson(config.pathWorld)
             if (resources != null) loadResources(resources)
             if (territoriesJson != null) loadTerritories(territoriesJson)
+            hiddenOreInvalidBlocks.load(config.pathOreCache)
             if (!Files.exists(config.pathTowns)) {
                 System.err.println("No towns found: ${config.pathTowns}")
                 return true
@@ -266,6 +281,12 @@ object Nodes {
             Deserializer.buildingsFromJson(config.pathBuildings)
             buildings.forEach { it.getSaveState() }
             return true
+        } catch (err: Exception) {
+            err.printStackTrace()
+            System.err.println("Error loading world: $err")
+            // don't let a broken in-memory state get autosaved over the last good files
+            needsSave = false
+            return false
         } finally {
             for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
                 Resident.create(player)

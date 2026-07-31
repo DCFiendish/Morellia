@@ -8,8 +8,10 @@ package net.aechronis.nodes.war.serdes
 import com.google.gson.JsonParser
 import net.aechronis.nodes.objects.Coord
 import net.aechronis.nodes.war.FlagWar
+import net.minestom.server.coordinate.BlockVec
 import java.io.FileReader
 import java.nio.file.Path
+import java.util.UUID
 
 object WarDeserializer {
 
@@ -46,6 +48,29 @@ object WarDeserializer {
 
                     FlagWar.loadOccupiedChunk(townName, coord)
                 }
+            }
+        }
+
+        // ===============================
+        // In-progress attacks
+        // ===============================
+        // WarSerializer has always written this array (see WarSerializer.kt), and
+        // FlagWar.loadAttack() exists specifically to restore an attack from it, but nothing
+        // ever called it here -- every attack in progress at shutdown was silently dropped on
+        // the next restart, and the flag/beacon blocks it had placed were left orphaned in the
+        // world with no Attack object tracking them anymore.
+        val jsonAttacks = jsonObj.get("attacks")?.asJsonArray
+        if (jsonAttacks !== null) {
+            for (jsonAttack in jsonAttacks) {
+                val attackObj = jsonAttack.asJsonObject
+                val attacker = UUID.fromString(attackObj.get("id").asString)
+                val cJson = attackObj.get("c").asJsonArray
+                val coord = Coord(cJson[0].asInt, cJson[1].asInt)
+                val bJson = attackObj.get("b").asJsonArray
+                val flagBase = BlockVec(bJson[0].asInt, bJson[1].asInt, bJson[2].asInt)
+                val completionTime = attackObj.get("t").asLong
+
+                FlagWar.loadAttack(attacker, coord, flagBase, completionTime)
             }
         }
     }
