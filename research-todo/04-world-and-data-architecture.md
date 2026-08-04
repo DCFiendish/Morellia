@@ -1,0 +1,26 @@
+# World & Data Architecture
+
+Two related but distinct open areas: the physical world/map, and the data layer underneath it (player data, territory data, permissions, logs). Grouped together here because the world-height and persistence-format decisions in the first half directly constrain the storage-format questions in the second half.
+
+## World generation & map design
+
+- `minestom-server-setup/04-world-generation-and-persistence.md` already recommends Polar for the real persistent map (Anvil only for one-time conversion, procedural `Generator` not a good fit) — but flags that "a genuinely enormous continent might push against Polar's single-file-load sweet spot." This can't be resolved until real map dimensions exist. **[DECISION — do map design first, then revisit the Polar-vs-Anvil call against actual size.]**
+- The map design itself — continent/world layout, biome distribution, spawn placement, how many nations/territories the world is sized for — is still fully open ("the deferred map-design discussion" per the setup guide). This is the actual prerequisite blocking the point above.
+- **World-height target is never established anywhere.** `nodes`' `OreSampler` and `Territory.defaultSpawnLocation` hardcode a legacy 0–255 assumption; nothing in `vanilla` or `combat` was checked against whichever height range the map actually uses. Decide: legacy (0–255) or modern extended range, then audit all three libraries' hardcoded Y-bounds against that decision — this also affects `NODES_DEEP_DIVE.md`'s flagged "ore-sampler Y-range off-by-one can leave the topmost Y-level unsampled" bug, which can't be properly fixed without knowing the real range first.
+
+## Persistence & data architecture
+
+The aspirational architecture in `RESEARCH.md` §7a/§16 (Redis for cross-shard pub/sub + shard registry, MongoDB scoped to `PlayerData` only) needs to be reconciled against what's actually confirmed in the three deep-dive docs:
+- `nodes` — hand-rolled JSON, single-process, file-lock (`NODES_DEEP_DIVE.md` §2.2).
+- `vanilla` — real gzip NBT `.dat` files per player (`VANILLA_DEEP_DIVE.md` §1.6), also single-process.
+- `logger` — embedded H2, also single-process (file-lock), per `RESEARCH.md` §13.
+
+None of these three are naturally multi-shard-safe. Is the intent "flagship world = single dedicated process, only hub-adjacent/cross-shard state (chat, shard registry) ever touches Mongo/Redis," or is this an unreconciled gap between an aspirational architecture doc and the libraries' actual implementation? This needs an explicit answer before scaffolding `world-server`, since it determines whether `world-server` can ever legitimately run as more than one process.
+
+Specific sub-questions:
+- **LuckPerms storage backend** — unconfirmed from source whether the community LuckPerms-Minestom fork defaults to per-process embedded storage (H2/SQLite). If so, permissions would silently desync the moment there's a second shard process. Needs an operational check (spin up the bridge, inspect its config/storage options) before launch, not just a source-read.
+- **Cross-shard `/invsee`/live inventory viewing** — undecided between a small inter-shard RPC call vs. accepting a slightly-stale view read from Mongo's `PlayerData` documents. Pick one; this is a staff-tooling requirement, not a nice-to-have, once there's more than one shard.
+- **`NodesConfig` save/backup period fields** — mentioned only in passing ("paths, save/backup periods") with no elaboration anywhere. Needs real answers: how often does it autosave, is the hand-rolled JSON writer atomic (temp-file + rename, or a truncate-in-place that can corrupt on crash mid-write — `VANILLA_DEEP_DIVE.md`'s PlayerData save-race bug suggests the latter pattern is already a known risk elsewhere in the codebase), and what happens on crash-during-write.
+- **`LoggerConfig`** — actual fields, retention/rotation policy for the embedded H2 database, and projected disk growth at 200+ concurrent players over weeks/months of uptime are all unresearched. This matters operationally (disk fills up silently) more than architecturally.
+- **Does `logger` data ever need cross-shard querying?** E.g. staff sitting on a hub shard running `/logger lookup` for an incident that happened on the world shard. Unlike `PlayerData`, this cross-shard-access question was never even raised for `logger` — worth deciding now while the answer is still "no" and simple, rather than after staff workflows assume otherwise.
+- **`nodes-map`'s exported JSON files** (`world.json`/`towns.json`/`war.json`/`buildings.json`) are architecturally load-bearing — the hub reads them read-only, and planned chat/roster features resolve town/nation membership from them — but their update frequency/staleness window has never been measured or designed. If hub-side chat filtering depends on "is this player in an enemy nation," a stale export could produce wrong friendly-fire/chat-visibility decisions.

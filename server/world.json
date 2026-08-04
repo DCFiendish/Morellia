@@ -1,0 +1,30 @@
+{
+  "nodes": {
+    "test_iron_income": {
+      "priority": 0,
+      "income": {
+        "minecraft:iron_ingot": 1.0
+      }
+    }
+  },
+  "territories": {
+    "1": {
+      "name": "Testville",
+      "color": 0,
+      "coreChunk": [0, 0],
+      "chunks": [0, 0, 1, 0, 0, 1, 1, 1],
+      "nodes": ["test_iron_income"],
+      "neighbors": [],
+      "isEdge": true
+    },
+    "2": {
+      "name": "Secondtown",
+      "color": 1,
+      "coreChunk": [5, 0],
+      "chunks": [5, 0, 6, 0, 5, 1, 6, 1],
+      "nodes": [],
+      "neighbors": [],
+      "isEdge": true
+    }
+  }
+}

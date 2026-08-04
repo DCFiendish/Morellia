@@ -1,0 +1,44 @@
+{
+    "_comment": "Morellia (Minestom) egg — import via Admin → Nests → Minecraft → Import Egg",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-07-30T00:00:00+00:00",
+    "name": "Morellia (Minestom)",
+    "author": "patri@morellia",
+    "description": "Custom Minestom-based server for the Morellia project. No stdin console commands are supported — Minestom has no built-in console reader and none of the aechronis libraries add one, so stop is signal-based (SIGINT) rather than a text command.",
+    "features": [],
+    "docker_images": {
+        "Java 25": "ghcr.io/pterodactyl/yolks:java_25"
+    },
+    "file_denylist": [],
+    "startup": "java -Xms128M -XX:MaxRAMPercentage=95.0 -jar {{SERVER_JARFILE}}",
+    "config": {
+        "files": "{}",
+        "startup": "{\"done\":\"Morellia test server ready\"}",
+        "logs": "[]",
+        "file_denylist": [],
+        "stop": "^C",
+        "extends": null
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/ash\n# Morellia install step — the jar is built locally (private GitHub Packages deps)\n# and uploaded via SFTP after server creation, not built inside this container.\n# This step just makes sure the server directory exists.\nmkdir -p /mnt/server\necho \"Morellia: upload ${SERVER_JARFILE:-server.jar} via SFTP, then start the server.\"\n",
+            "container": "ghcr.io/pterodactyl/installers:alpine",
+            "entrypoint": "ash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Server Jar File",
+            "description": "The name of the jar file to execute.",
+            "env_variable": "SERVER_JARFILE",
+            "default_value": "server.jar",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "required|string|max:20",
+            "field_type": "text"
+        }
+    ]
+}
