@@ -85,21 +85,6 @@ application {
     mainClass.set("net.morellia.server.MainKt")
 }
 
-tasks.register<JavaExec>("diagnose") {
-    mainClass.set("net.morellia.server.DiagnoseTerrainKt")
-    classpath = sourceSets["main"].runtimeClasspath
-}
-
-tasks.register<JavaExec>("bootTest") {
-    mainClass.set("net.morellia.server.BootTestKt")
-    classpath = sourceSets["main"].runtimeClasspath
-}
-
-tasks.register<JavaExec>("warTestProbe") {
-    mainClass.set("net.morellia.server.WarTestProbeKt")
-    classpath = sourceSets["main"].runtimeClasspath
-}
-
 tasks.shadowJar {
     archiveBaseName.set("morellia-server")
     archiveClassifier.set("")
