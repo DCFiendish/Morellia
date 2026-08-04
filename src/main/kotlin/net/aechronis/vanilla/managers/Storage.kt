@@ -119,14 +119,36 @@ object Storage {
     }
 
     fun saveAll() {
-        val chunks = mutableSetOf<Chunk>()
-        for (key in barrels.keys) {
-            try {
-                if (writeToBlock(key)) key.instance.getChunkAt(key.pos)?.let(chunks::add)
-            } catch (e: Exception) {
-                System.err.println("Failed to save storage at $key: ${e.message}")
+        // saveAll() runs on the global scheduler thread (like Crops'/Saplings' periodic tasks),
+        // which per Minestom's threading model has no synchronization guarantee for touching
+        // chunk/block state directly. writeToBlock() -> setBlock() used to run straight from here
+        // with no deferral -- unlike every other periodic block-touching task in this codebase --
+        // so this 300s autosave sweep could race a player's own in-progress interaction with the
+        // same barrel on the instance's real tick thread, corrupting the write or dropping it
+        // (items silently vanish from the barrel). Defer each write onto its owning instance's own
+        // tick thread instead, same as Crops.growthTick, and wait for all of them (via
+        // self-completed futures, since scheduleNextTick doesn't hand back one) before moving on to
+        // the chunk-save step below, which depends on the writes already having happened.
+        val chunks = ConcurrentHashMap.newKeySet<Chunk>()
+        val writeFutures = barrels.keys.map { key ->
+            val future = CompletableFuture<Void>()
+            key.instance.scheduleNextTick {
+                try {
+                    if (writeToBlock(key)) key.instance.getChunkAt(key.pos)?.let(chunks::add)
+                } catch (e: Exception) {
+                    System.err.println("Failed to save storage at $key: ${e.message}")
+                } finally {
+                    future.complete(null)
+                }
             }
+            future
         }
+        try {
+            CompletableFuture.allOf(*writeFutures.toTypedArray()).join()
+        } catch (e: Exception) {
+            System.err.println("Failed to wait for one or more storage writes: ${e.message}")
+        }
+
         val saves = chunks.map { chunk -> chunk.instance.saveChunkToStorage(chunk) }
         try {
             CompletableFuture.allOf(*saves.toTypedArray()).join()

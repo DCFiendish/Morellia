@@ -7,15 +7,28 @@ import net.minestom.server.event.player.PlayerBlockPlaceEvent
 import net.minestom.server.event.player.PlayerInputEvent
 import net.minestom.server.instance.Instance
 import net.minestom.server.instance.block.Block
-import java.util.TreeSet
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentSkipListSet
 import kotlin.math.abs
 
 // based on ccnet elevators
 object Elevator {
     private val IRON = Block.IRON_BLOCK
     private val TYPE = Block.Getter.Condition.TYPE
-    private val columns = HashMap<UUID, HashMap<Long, TreeSet<Int>>>()
+
+    // Was plain HashMap<UUID, HashMap<Long, TreeSet<Int>>>, unlike every other stateful manager
+    // in this codebase (Crops, Saplings, Combat, Food, EnvironmentalDamage, PlayerData), which all
+    // use ConcurrentHashMap because Minestom can tick different instances/chunks on different
+    // threads. getOrScanColumn's getOrPut (a compound read-modify-write) ran from onInput (fired
+    // per player), while PlayerBlockPlaceEvent/PlayerBlockBreakEvent mutated the inner TreeSet
+    // directly from their own listener threads -- no lock anywhere. Two players racing on the same
+    // column could corrupt the plain HashMap's bucket chain (a classic concurrent-structural-
+    // modification hang) or hit a torn TreeSet read mid-add/remove, handing back a stale targetY
+    // and teleporting someone into a solid block. ConcurrentSkipListSet is a drop-in replacement
+    // for TreeSet<Int> here -- same higher()/lower()/add()/remove() surface this file already uses
+    // -- but safe under concurrent access.
+    private val columns = ConcurrentHashMap<UUID, ConcurrentHashMap<Long, ConcurrentSkipListSet<Int>>>()
 
     private fun columnKey(
         x: Int,
@@ -26,10 +39,10 @@ object Elevator {
         instance: Instance,
         x: Int,
         z: Int,
-    ): TreeSet<Int> {
-        val byInstance = columns.getOrPut(instance.uuid) { HashMap() }
-        return byInstance.getOrPut(columnKey(x, z)) {
-            val set = TreeSet<Int>()
+    ): ConcurrentSkipListSet<Int> {
+        val byInstance = columns.computeIfAbsent(instance.uuid) { ConcurrentHashMap() }
+        return byInstance.computeIfAbsent(columnKey(x, z)) {
+            val set = ConcurrentSkipListSet<Int>()
             for (y in -64..320) {
                 if (instance.getBlock(x, y, z, TYPE) === IRON) set.add(y)
             }
