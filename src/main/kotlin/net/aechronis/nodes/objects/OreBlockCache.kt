@@ -15,6 +15,7 @@ import net.minestom.server.coordinate.BlockVec
 import java.io.FileReader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class OreBlockCache {
@@ -43,7 +44,14 @@ class OreBlockCache {
         }
         json.append("]")
         Files.createDirectories(path.parent)
-        Files.writeString(path, json.toString())
+
+        // Write via a sibling temp file + atomic rename rather than truncating the real file in
+        // place -- a crash mid-write here would leave an invalid/truncated ledger, and on next
+        // boot a truncated ledger is indistinguishable from an empty one, silently re-opening the
+        // place-then-rebreak ore dupe this cache exists to close.
+        val tmpPath = path.resolveSibling("${path.fileName}.tmp")
+        Files.writeString(tmpPath, json.toString())
+        Files.move(tmpPath, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
 
     fun load(path: Path) {

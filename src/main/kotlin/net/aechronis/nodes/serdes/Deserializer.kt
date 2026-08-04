@@ -253,7 +253,18 @@ object Deserializer {
                             val permGroupList = permissionsJson.get(type)?.asJsonArray
                             if (permGroupList !== null) {
                                 for (group in permGroupList) {
-                                    permissions[permType]!!.add(PermissionsGroup.values[group.asInt])
+                                    // Bounds-checked: an out-of-range index here (a stale save
+                                    // from before PermissionsGroup gained/lost a value, or a
+                                    // hand-edited file) used to throw an uncaught
+                                    // ArrayIndexOutOfBoundsException -- not covered by the
+                                    // IllegalArgumentException catch below -- aborting the load of
+                                    // every town/nation/resident instead of just this one entry.
+                                    val index = group.asInt
+                                    if (index < 0 || index >= PermissionsGroup.values.size) {
+                                        System.err.println("Invalid town permission group index for town $name: $index")
+                                        continue
+                                    }
+                                    permissions[permType]!!.add(PermissionsGroup.values[index])
                                 }
                             }
                         } catch (err: IllegalArgumentException) {
@@ -388,6 +399,15 @@ object Deserializer {
                 // parse capital town name
                 var capitalName = nation.get("capital")?.asString
                 if (capitalName == null) {
+                    // towns[0] used to be read unconditionally here -- a nation left behind with
+                    // no capital AND no towns (e.g. from a partial prior save, after all its towns
+                    // were removed) threw an uncaught IndexOutOfBoundsException, aborting the load
+                    // of every nation/town/resident instead of just skipping this one malformed
+                    // entry.
+                    if (towns.isEmpty()) {
+                        System.err.println("Capital for nation $name not found and nation has no towns -- skipping")
+                        return@forEach
+                    }
                     System.err.println("Capital for: $name not found, setting it to ${towns[0]}")
                     capitalName = towns[0]
                 }

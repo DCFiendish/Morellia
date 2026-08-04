@@ -56,9 +56,17 @@ class Attack(
     // text display used to show town name and progress on flag
     val textDisplay = AttackTextDisplay(this, flagBase.add(0.5, 3.0, 0.5).asPos())
 
-    // re-used json serialization StringBuilders
+    // Pre-generated, immutable-after-init base of the json serialization -- safe to read
+    // concurrently since nothing ever mutates it again after the constructor. toJson() used to
+    // also reuse a second shared `jsonString` StringBuilder field here, mutating it in place
+    // (setLength(0) + append) and returning it *by reference* on every call. WarSerializer.save()
+    // collects those live references and, when saving asynchronously, hands them to a background
+    // thread that reads them via CompletableFuture.runAsync -- if the save loop fired again before
+    // that read finished (easily possible during an active war, saves run on every needsSave tick),
+    // the main thread would call toJson() again and mutate the very StringBuilder the background
+    // thread was still iterating. toJson() now allocates a fresh StringBuilder per call instead --
+    // removes the shared mutable state instead of trying to synchronize around it.
     val jsonStringBase: StringBuilder
-    val jsonString: StringBuilder
 
     init {
         val flagX = flagBase.blockX
@@ -82,11 +90,6 @@ class Attack(
             this.coord,
             this.flagBase,
         )
-
-        // full json StringBuilder, initialize capacity to be
-        // base capacity + room for completion timestamp length
-        val jsonStringBufferSize = this.jsonStringBase.capacity() + 20
-        this.jsonString = StringBuilder(jsonStringBufferSize)
     }
 
     override fun run() {
@@ -98,23 +101,20 @@ class Attack(
         FlagWar.cancelAttack(this)
     }
 
-    // returns json format string as a StringBuilder
+    // returns json format string as a fresh StringBuilder every call -- see the comment on
+    // jsonStringBase above for why this must not reuse/mutate a shared field.
     // only used with WarSerializer objects
     fun toJson(): StringBuilder {
-        // reset json StringBuilder
-        this.jsonString.setLength(0)
-
-        // add base
-        this.jsonString.append(this.jsonStringBase)
-
-        // add completion time
         val now = System.currentTimeMillis() / 1000
         val remainingSeconds = (this.attackTime - this.progress) / FlagWar.ATTACK_TICK
         val completionTime = now + remainingSeconds
-        this.jsonString.append("\"t\":$completionTime")
-        this.jsonString.append("}")
 
-        return this.jsonString
+        val result = StringBuilder(this.jsonStringBase.length + 20)
+        result.append(this.jsonStringBase)
+        result.append("\"t\":$completionTime")
+        result.append("}")
+
+        return result
     }
 }
 

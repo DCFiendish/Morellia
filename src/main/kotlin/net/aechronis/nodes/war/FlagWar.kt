@@ -102,6 +102,11 @@ object FlagWar {
     // ending in different chunks at the same moment could mutate these concurrently.
     internal val attackers: ConcurrentHashMap<UUID, CopyOnWriteArrayList<Attack>> = ConcurrentHashMap()
 
+    // Per-attacker lock objects, used only to serialize beginAttack's maxPlayerChunkAttacks
+    // check against its own later attackers-list add (see beginAttack) -- not a general-purpose
+    // lock, and never held across different attackers, so it adds no cross-player contention.
+    private val attackerLocks: ConcurrentHashMap<UUID, Any> = ConcurrentHashMap()
+
     // map chunk -> Attack instance
     internal val chunkToAttacker: ConcurrentHashMap<Coord, Attack> = ConcurrentHashMap()
 
@@ -385,26 +390,33 @@ object FlagWar {
                 }
             }
 
-            // attacker's current attacks (if any exist)
-            var currentAttacks = attackers.get(attacker)
-            if (currentAttacks == null) {
-                currentAttacks = CopyOnWriteArrayList()
-                attackers.put(attacker, currentAttacks)
-            } else if (currentAttacks.size >= Nodes.config.maxPlayerChunkAttacks) {
-                return Result.failure(ErrorTooManyAttacks)
+            // Check-and-reserve the attacker's concurrent-attack slot atomically, synchronized
+            // per attacker. This size check and the real attackers-list add (inside createAttack,
+            // after placing real blocks/beacons -- genuinely slow work) used to be two separate
+            // steps with no lock between them: two concurrent beginAttack calls for the same
+            // attacker (e.g. flag placements in two different chunks landing on two different
+            // Minestom chunk-owner threads in the same tick) could both read the pre-add size and
+            // both pass the check, silently bypassing maxPlayerChunkAttacks. Locking per attacker
+            // (not globally) means different players' attacks never contend with each other.
+            val attackerLock = attackerLocks.computeIfAbsent(attacker) { Any() }
+            synchronized(attackerLock) {
+                val currentAttacks = attackers.get(attacker)
+                if (currentAttacks != null && currentAttacks.size >= Nodes.config.maxPlayerChunkAttacks) {
+                    return Result.failure(ErrorTooManyAttacks)
+                }
+
+                val attack = createAttack(
+                    attacker,
+                    attackingTown,
+                    chunk,
+                    flagBase,
+                )
+
+                // mark that save required
+                needsSave = true
+
+                return Result.success(attack)
             }
-
-            val attack = createAttack(
-                attacker,
-                attackingTown,
-                chunk,
-                flagBase,
-            )
-
-            // mark that save required
-            needsSave = true
-
-            return Result.success(attack)
         } else {
             return Result.failure(ErrorNotEnemy)
         }
