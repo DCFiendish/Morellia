@@ -2,6 +2,8 @@ package net.aechronis.nodes
 
 import net.aechronis.nodes.constants.PermissionsGroup
 import net.aechronis.nodes.constants.TownPermissions
+import net.aechronis.nodes.objects.OreDeposit
+import net.aechronis.nodes.objects.OreSampler
 import net.aechronis.nodes.objects.Plot
 import net.aechronis.nodes.objects.Resident
 import net.aechronis.nodes.objects.Territory
@@ -18,6 +20,7 @@ import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
 import net.minestom.server.event.player.PlayerBlockInteractEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.event.server.ServerTickMonitorEvent
+import net.minestom.server.item.Material
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -209,6 +212,213 @@ class NodesTest {
     fun `can enable war`() {
         FlagWar.enable(canAnnexTerritories = true, canOnlyAttackBorders = false, destructionEnabled = true)
         assertTrue(Nodes.war.enabled, "War should be enabled")
+    }
+
+    // ---- OreSampler ----
+
+    @Test
+    fun `ore sampler returns nothing at a y-level with no configured deposits`() {
+        val sampler = OreSampler(arrayListOf(OreDeposit(Material.DIAMOND, 1.0, 1, 1, ymin = 0, ymax = 10)))
+        repeat(50) {
+            assertTrue(sampler.sample(200).isEmpty(), "Should never drop outside the deposit's y-range")
+        }
+    }
+
+    @Test
+    fun `ore sampler returns nothing outside the world height bounds`() {
+        val sampler = OreSampler(arrayListOf(OreDeposit(Material.DIAMOND, 1.0, 1, 1)))
+        assertTrue(sampler.sample(-1).isEmpty(), "y below world min should return no drops")
+        assertTrue(sampler.sample(256).isEmpty(), "y above world max should return no drops")
+    }
+
+    @Test
+    fun `ore sampler drops at the topmost world height, y=255`() {
+        // Regression test for a fixed off-by-one: the height-interval builder used to stop one
+        // short of Y_WORLD_MAX (255), leaving that single top level with no distribution at all
+        // no matter how the deposits were configured.
+        val sampler = OreSampler(arrayListOf(OreDeposit(Material.DIAMOND, 1.0, 1, 1, ymin = 250, ymax = 255)))
+        repeat(50) {
+            val drop = sampler.sample(255)
+            assertTrue(drop.isNotEmpty(), "y=255 should still be sampled")
+            assertEquals(Material.DIAMOND, drop[0].material())
+        }
+    }
+
+    @Test
+    fun `ore sampler amount stays within the deposit's configured range`() {
+        val sampler = OreSampler(arrayListOf(OreDeposit(Material.GOLD_INGOT, 1.0, 2, 5, ymin = 0, ymax = 10)))
+        repeat(200) {
+            val drop = sampler.sample(5)
+            assertTrue(drop.isNotEmpty())
+            val amount = drop[0].amount()
+            assertTrue(amount in 2..5, "amount $amount should be within [2, 5]")
+        }
+    }
+
+    @Test
+    fun `ore sampler favors the higher drop-chance material`() {
+        val sampler = OreSampler(
+            arrayListOf(
+                OreDeposit(Material.DIAMOND, 0.9, 1, 1, ymin = 0, ymax = 10),
+                OreDeposit(Material.COAL, 0.1, 1, 1, ymin = 0, ymax = 10),
+            ),
+        )
+        var diamonds = 0
+        var coal = 0
+        repeat(2000) {
+            val drop = sampler.sample(5)
+            when (drop.getOrNull(0)?.material()) {
+                Material.DIAMOND -> diamonds++
+                Material.COAL -> coal++
+                else -> {}
+            }
+        }
+        assertTrue(diamonds > coal, "the 0.9-weighted material ($diamonds) should drop far more than the 0.1-weighted one ($coal)")
+    }
+
+    // ---- FlagWar.calculateAttackTimeTicks ----
+
+    @Test
+    fun `attack time is chunk attack time converted from ms to ticks with no modifiers`() {
+        val ticks = FlagWar.calculateAttackTimeTicks(
+            chunkAttackTimeMs = 5000L,
+            bordersWilderness = false,
+            wastelandMultiplier = 2.0,
+            hasOwningTown = false,
+            isHomeTerritory = false,
+            homeMultiplier = 2.0,
+            isDefendingSide = false,
+            defenderTimeMultiplier = 1.0,
+            attackerTimeMultiplier = 1.0,
+        )
+        assertEquals(100L, ticks) // 5000ms * 20 / 1000
+    }
+
+    @Test
+    fun `attack time applies the wasteland multiplier when bordering wilderness`() {
+        val ticks = FlagWar.calculateAttackTimeTicks(
+            chunkAttackTimeMs = 5000L,
+            bordersWilderness = true,
+            wastelandMultiplier = 2.0,
+            hasOwningTown = false,
+            isHomeTerritory = false,
+            homeMultiplier = 2.0,
+            isDefendingSide = false,
+            defenderTimeMultiplier = 1.0,
+            attackerTimeMultiplier = 1.0,
+        )
+        assertEquals(200L, ticks)
+    }
+
+    @Test
+    fun `attack time modifiers never apply without an owning town, even if the flags are set`() {
+        val ticks = FlagWar.calculateAttackTimeTicks(
+            chunkAttackTimeMs = 5000L,
+            bordersWilderness = false,
+            wastelandMultiplier = 2.0,
+            hasOwningTown = false,
+            isHomeTerritory = true,
+            homeMultiplier = 5.0,
+            isDefendingSide = true,
+            defenderTimeMultiplier = 3.0,
+            attackerTimeMultiplier = 1.0,
+        )
+        assertEquals(100L, ticks, "home/defender/attacker multipliers must be gated on hasOwningTown")
+    }
+
+    @Test
+    fun `attack time applies the home multiplier only for the town's home territory`() {
+        val ticks = FlagWar.calculateAttackTimeTicks(
+            chunkAttackTimeMs = 5000L,
+            bordersWilderness = false,
+            wastelandMultiplier = 2.0,
+            hasOwningTown = true,
+            isHomeTerritory = true,
+            homeMultiplier = 3.0,
+            isDefendingSide = false,
+            defenderTimeMultiplier = 1.0,
+            attackerTimeMultiplier = 1.0,
+        )
+        assertEquals(300L, ticks)
+    }
+
+    @Test
+    fun `attack time uses the defender multiplier when defending, attacker multiplier otherwise`() {
+        val defending = FlagWar.calculateAttackTimeTicks(
+            chunkAttackTimeMs = 5000L,
+            bordersWilderness = false,
+            wastelandMultiplier = 1.0,
+            hasOwningTown = true,
+            isHomeTerritory = false,
+            homeMultiplier = 1.0,
+            isDefendingSide = true,
+            defenderTimeMultiplier = 4.0,
+            attackerTimeMultiplier = 0.5,
+        )
+        val attacking = FlagWar.calculateAttackTimeTicks(
+            chunkAttackTimeMs = 5000L,
+            bordersWilderness = false,
+            wastelandMultiplier = 1.0,
+            hasOwningTown = true,
+            isHomeTerritory = false,
+            homeMultiplier = 1.0,
+            isDefendingSide = false,
+            defenderTimeMultiplier = 4.0,
+            attackerTimeMultiplier = 0.5,
+        )
+        assertEquals(400L, defending)
+        assertEquals(50L, attacking)
+    }
+
+    @Test
+    fun `attack time compounds all applicable modifiers together`() {
+        val ticks = FlagWar.calculateAttackTimeTicks(
+            chunkAttackTimeMs = 1000L,
+            bordersWilderness = true,
+            wastelandMultiplier = 2.0,
+            hasOwningTown = true,
+            isHomeTerritory = true,
+            homeMultiplier = 3.0,
+            isDefendingSide = true,
+            defenderTimeMultiplier = 2.0,
+            attackerTimeMultiplier = 1.0,
+        )
+        // 1000ms -> 20 ticks, * wasteland(2) * home(3) * defender(2) = 240
+        assertEquals(240L, ticks)
+    }
+
+    // ---- Nodes.rateToAmount ----
+
+    @Test
+    fun `rateToAmount grants nothing for a zero or negative rate`() {
+        assertEquals(0, Nodes.rateToAmount(0.0))
+        assertEquals(0, Nodes.rateToAmount(-3.5))
+    }
+
+    @Test
+    fun `rateToAmount grants exactly the rate when it's a whole number`() {
+        repeat(20) {
+            assertEquals(5, Nodes.rateToAmount(5.0))
+        }
+    }
+
+    @Test
+    fun `rateToAmount stays within floor and floor plus one for a fractional rate`() {
+        repeat(500) {
+            val amount = Nodes.rateToAmount(3.4)
+            assertTrue(amount == 3 || amount == 4, "expected 3 or 4, got $amount")
+        }
+    }
+
+    @Test
+    fun `rateToAmount's extra unit roughly tracks the fractional probability`() {
+        var extraGranted = 0
+        val trials = 5000
+        repeat(trials) {
+            if (Nodes.rateToAmount(2.5) == 3) extraGranted++
+        }
+        val observedRate = extraGranted.toDouble() / trials
+        assertTrue(observedRate in 0.35..0.65, "expected roughly 50% of trials to grant the extra unit, got $observedRate")
     }
 
     @AfterAll

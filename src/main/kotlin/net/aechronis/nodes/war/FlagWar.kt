@@ -422,6 +422,33 @@ object FlagWar {
         }
     }
 
+    // Pure attack-time formula, pulled out of createAttack() so it's testable without a live
+    // Minestom instance/Territory/Town graph. chunkAttackTimeMs is converted to ticks (20/1000)
+    // then multiplied by whichever modifiers apply, in the same order the inline version used.
+    internal fun calculateAttackTimeTicks(
+        chunkAttackTimeMs: Long,
+        bordersWilderness: Boolean,
+        wastelandMultiplier: Double,
+        hasOwningTown: Boolean,
+        isHomeTerritory: Boolean,
+        homeMultiplier: Double,
+        isDefendingSide: Boolean,
+        defenderTimeMultiplier: Double,
+        attackerTimeMultiplier: Double,
+    ): Long {
+        var attackTime = chunkAttackTimeMs.toDouble() * 20 / 1000
+        if (bordersWilderness) {
+            attackTime *= wastelandMultiplier
+        }
+        if (hasOwningTown) {
+            if (isHomeTerritory) {
+                attackTime *= homeMultiplier
+            }
+            attackTime *= if (isDefendingSide) defenderTimeMultiplier else attackerTimeMultiplier
+        }
+        return attackTime.toLong()
+    }
+
     // actually creates attack instance
     internal fun createAttack(
         attacker: UUID,
@@ -441,23 +468,18 @@ object FlagWar {
         val progressBar = BossBar.bossBar(Component.text("Attacking ${territory.town!!.name} at ($flagBaseX, $flagBaseY, $flagBaseZ)"), 1f, BossBar.Color.YELLOW, BossBar.Overlay.PROGRESS)
 
         // calculate max attack time based on chunk and other modifiers
-        // convert milliseconds to ticks
-        var attackTime = Nodes.config.chunkAttackTime.toDouble() * 20 / 1000
-        if (territory.bordersWilderness) {
-            attackTime *= Nodes.config.chunkAttackFromWastelandMultiplier
-        }
-        // town specific claim time modifiers
         val terrTown = territory.town
-        if (terrTown !== null) {
-            if (territory.id == terrTown.home) {
-                attackTime *= Nodes.config.chunkAttackHomeMultiplier
-            }
-            attackTime *= if (terrTown.uuid == attackingTown.uuid || Town.areAllied(terrTown, attackingTown)) {
-                territory.defenderTimeMultiplier
-            } else {
-                territory.attackerTimeMultiplier
-            }
-        }
+        val attackTimeTicks = calculateAttackTimeTicks(
+            chunkAttackTimeMs = Nodes.config.chunkAttackTime,
+            bordersWilderness = territory.bordersWilderness,
+            wastelandMultiplier = Nodes.config.chunkAttackFromWastelandMultiplier,
+            hasOwningTown = terrTown !== null,
+            isHomeTerritory = terrTown !== null && territory.id == terrTown.home,
+            homeMultiplier = Nodes.config.chunkAttackHomeMultiplier,
+            isDefendingSide = terrTown !== null && (terrTown.uuid == attackingTown.uuid || Town.areAllied(terrTown, attackingTown)),
+            defenderTimeMultiplier = territory.defenderTimeMultiplier,
+            attackerTimeMultiplier = territory.attackerTimeMultiplier,
+        )
 
         val progress = 0L
 
@@ -503,7 +525,7 @@ object FlagWar {
             skyBeaconColorBlocks.toList(),
             skyBeaconWireframeBlocks.toList(),
             progressBar,
-            attackTime.toLong(),
+            attackTimeTicks,
             progress,
         )
 

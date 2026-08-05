@@ -347,14 +347,19 @@ object Nodes {
         towns.values.forEach { town -> if (town.income.pushToStorage(false)) town.needsUpdate() }
     }
 
+    // Pulled out of runIncome() so it's directly testable without a live town/territory graph.
+    // Always grants the whole-number part of the rate; the leftover fraction is a probabilistic
+    // extra unit (e.g. a 2.3-per-cycle rate always grants 2, plus a 30% chance of a 3rd) rather
+    // than being silently dropped or always rounded down.
+    internal fun rateToAmount(rate: Double): Int {
+        if (rate <= 0.0) return 0
+        val integer = kotlin.math.floor(rate)
+        val fractional = kotlin.math.max(0.0, rate - integer)
+        return integer.toInt() + if (fractional > 0.0 && ThreadLocalRandom.current().nextDouble() < fractional) 1 else 0
+    }
+
     /** Cross-domain income engine. */
     fun runIncome() {
-        fun rateToAmount(rate: Double): Int {
-            if (rate <= 0.0) return 0
-            val integer = kotlin.math.floor(rate)
-            val fractional = kotlin.math.max(0.0, rate - integer)
-            return integer.toInt() + if (fractional > 0.0 && ThreadLocalRandom.current().nextDouble() < fractional) 1 else 0
-        }
         val taxRate = config.taxIncomeRate.coerceIn(0.0, 1.0)
         val keptRate = 1.0 - taxRate
         towns.values.forEach { town ->
