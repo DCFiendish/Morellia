@@ -10,7 +10,7 @@ Research only — no money spent, no accounts created, no code written yet.
 |---|---|
 | **nodes** | Territory/nation library — direct Kotlin port of `phonon/minecraft-nodes`'s "Frontier Wars" system: `Territory → Town → Nation`, capturable resource nodes (ore/farms/ports), `FlagWar`/siege capture mechanic, plots, alliances. |
 | **nodes-map** | Static JS (deck.gl/Webpack) map viewer that polls JSON (`world.json`, `towns.json`, `war.json`, `buildings.json`) exported by `nodes` — a Dynmap-style overlay, no backend of its own. |
-| **combat** | **Gun + melee combat library** — this is your musket answer, see below. |
+| **combat** | **Gun + melee combat library** — this is your First Balkan War-era weapons answer, see below. |
 | **vanilla** | Reimplements standard vanilla MC features Minestom doesn't ship with by default. |
 | **worldedit** | WorldEdit-equivalent for Minestom. |
 | **logger** | Player action logging. |
@@ -23,15 +23,19 @@ Research only — no money spent, no accounts created, no code written yet.
 
 No public "server"/"core"/"proxy" repo exists that ties these into one runnable server for outside consumers — a new server project needs to be scaffolded that depends on `nodes` + `combat` + `vanilla` (+ `utils`) together, following the `library` template's shape. All libraries publish to **GitHub Packages** (`maven.pkg.github.com/Aechronis/...`) at pinned commit-SHA versions, requiring a GitHub token in the consuming project's Gradle repositories block.
 
-## 2. Musket-style PvP — already solved by `Aechronis/combat`
+## 2. First Balkan War-era PvP — already solved by `Aechronis/combat`
 
-No need to build a gun plugin from scratch or bolt on an external one (nothing musket-specific exists off the shelf anyway — checked Modrinth/Bukkit plugins for reference only). `combat`'s `Gun` is a **data-class item**: every stat (`damage`, `automatic`, `cooldown`, `reloadTime`, `spreadMin/Max`, `recoilMin/Max`, sounds, particles) is a constructor parameter. A musket is just one `Gun(...)` instance configured as:
+**Theme decided (2026-08-05): the First Balkan War (1912–1913)** — Balkan League (Serbia, Bulgaria, Greece, Montenegro) vs. the Ottoman Empire. This replaces the earlier generic "musket-era" placeholder framing below; the actual arms of this war are bolt-action repeating rifles (Mauser/Mannlicher/Mosin-family), early Maxim-type machine guns, and horse-drawn field artillery — not flintlock muskets. The technical fit described below (built for a generic slow/period-accurate weapon feel) still holds, just aim the specific stat tuning at this era instead of a black-powder one.
 
-- `automatic = false` (single-shot)
-- long `reloadTime`, high `damage` (one/two-shot kill), low `spreadMin` (accurate when standing still), spread scaling up with movement speed (built in via `spread(speed)`)
+No need to build a gun plugin from scratch or bolt on an external one (nothing era-specific exists off the shelf anyway — checked Modrinth/Bukkit plugins for reference only). `combat`'s `Gun` is a **data-class item**: every stat (`damage`, `automatic`, `cooldown`, `reloadTime`, `spreadMin/Max`, `recoilMin/Max`, sounds, particles) is a constructor parameter. A period bolt-action rifle is just one `Gun(...)` instance configured as:
+
+- `automatic = false` (bolt-action, one round per trigger pull — not literally single-shot-then-reload like a musket, but the same "can't just hold the trigger" balance property)
+- moderate `reloadTime` (faster than a muzzle-loader, still slow relative to semi-auto), high `damage` (one/two-shot kill), low `spreadMin` (accurate when standing still), spread scaling up with movement speed (built in via `spread(speed)`)
 - optional `bulletTrailParticle` for a visible tracer, custom fire/reload sounds
 
-Mechanically: hit detection is **hitscan raycasting** (`Ray.kt`, segment-AABB intersection against blocks/entities/vehicles), not physical ballistic projectiles — fine for a musket duel feel, though it means no travel-time/drop, which is the one gap versus true black-powder realism if that matters. Ammo is tracked via item `DataComponents.DAMAGE` (not NBT) specifically to avoid triggering item-swap animations; reload is a repeating 100ms task with a title progress bar, cancelable on item switch. Melee combat in the same library is a from-scratch modern-vanilla-accurate reimplementation (attack cooldown scaling, crits, sweep, sprint knockback) — usable as-is for musket-bayonet-style melee too.
+The same data-class flexibility covers the rest of the era's weapon roster without new code: `automatic = true` with a fast `cooldown` and larger ammo pool models an early Maxim gun, and a very high-damage/low-`cooldown`/short-range instance can stand in for close-support artillery until/unless a dedicated explosive-shell mechanic is designed separately.
+
+Mechanically: hit detection is **hitscan raycasting** (`Ray.kt`, segment-AABB intersection against blocks/entities/vehicles), not physical ballistic projectiles — fine for this era's rifle feel, though it means no travel-time/drop, which is the one gap versus true ballistic ammunition if that matters. Ammo is tracked via item `DataComponents.DAMAGE` (not NBT) specifically to avoid triggering item-swap animations; reload is a repeating 100ms task with a title progress bar, cancelable on item switch. Melee combat in the same library is a from-scratch modern-vanilla-accurate reimplementation (attack cooldown scaling, crits, sweep, sprint knockback) — usable as-is for bayonet-style melee too, which was standard-issue for this war's infantry.
 
 Integration reference: `CombatTest.kt` in the repo shows the real usage pattern — construct `Ammo`, `Gun`, `Melee` instances, `Item.registerItems(...)`, then `Combat.initialize()`. `combat` depends on `Minestom 2026.07.12-26.2` and `Aechronis/utils` only — no external combat framework.
 
@@ -59,7 +63,7 @@ Minestom itself has **no built-in clustering** — every multi-server Minestom n
 ## 5. Open items for a follow-up planning pass (once you're ready to design, not just research)
 
 - Whether an Aechronis "server"/core repo exists privately that already wires `nodes`+`combat`+`vanilla` together — worth checking with GitHub auth if you have org access.
-- Whether you want hitscan (current `combat` Gun model) or true ballistic-drop muskets — hitscan is what's built, ballistic would be a fork/extension of `Projectile.kt`.
+- Whether you want hitscan (current `combat` Gun model) or true ballistic-drop rifle/artillery rounds — hitscan is what's built, ballistic would be a fork/extension of `Projectile.kt`.
 - Concrete Velocity+Redis+Mongo scaffold and shard-count decision once you have a target player-per-shard number from real load testing.
 
 ## 6. Permissions: friendly fire, build access, combat mode, command gating
