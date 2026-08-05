@@ -7,6 +7,7 @@ import net.kyori.adventure.text.Component
 import net.minestom.server.MinecraftServer
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 object Whitelist {
@@ -21,6 +22,7 @@ object Whitelist {
     // lowercase name -> entry
     private val entries = ConcurrentHashMap<String, Entry>()
     private val gson = Gson()
+    private val saveLock = Any()
 
     private lateinit var entriesFile: Path
     private lateinit var stateFile: Path
@@ -89,9 +91,19 @@ object Whitelist {
         }
     }
 
+    // Two admins (or a rapid double-invocation) calling add()/remove() concurrently used to be
+    // able to interleave writes into invalid JSON -- entries is a ConcurrentHashMap (safe to
+    // snapshot), but the file write itself wasn't guarded, and two writers racing on the same
+    // temp-file path would corrupt each other's content before either rename could land. Both
+    // the lock (serializes writers) and the temp-file+atomic-rename (no reader ever sees a
+    // partial write, matches OreBlockCache/PlayerData/SaveManager's existing pattern) are needed.
     private fun save() {
-        Files.newBufferedWriter(entriesFile).use { writer ->
-            gson.toJson(entries.values.toList(), writer)
+        synchronized(saveLock) {
+            val tmpPath = entriesFile.resolveSibling("${entriesFile.fileName}.tmp")
+            Files.newBufferedWriter(tmpPath).use { writer ->
+                gson.toJson(entries.values.toList(), writer)
+            }
+            Files.move(tmpPath, entriesFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         }
     }
 
