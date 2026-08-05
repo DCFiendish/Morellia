@@ -37,6 +37,14 @@ object NodesPlayerDamageListener {
     }
 
     fun init() {
-        Nodes.eventNode.addListener(EntityDamageEvent::class.java, this::onDamage)
+        // Must run before vanilla's CombatListener (which tags on any non-self EntityDamageEvent
+        // and checks event.isCancelled). Nodes.eventNode and Vanilla.eventNode are same-priority
+        // siblings under the global handler, and Minestom compiles+dispatches each sibling's whole
+        // subtree as one unit in priority order -- ties fall back to insertion order, and Vanilla.init()
+        // currently runs before Nodes.initialize(), so a same-priority registration here would lose
+        // the race and cancel the event only after combat-tag already fired. highPriorityEventNode
+        // (-999) is the existing convention for exactly this "must run and possibly cancel before
+        // other systems react" case (see NodesWorldListener/NodesPlotSelectionListener).
+        Nodes.highPriorityEventNode.addListener(EntityDamageEvent::class.java, this::onDamage)
     }
 }
