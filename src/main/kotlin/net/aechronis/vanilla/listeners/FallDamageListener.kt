@@ -33,7 +33,14 @@ object FallDamageListener {
         }
 
         val newY = event.newPosition.y
-        if (player.instance?.getBlock(event.newPosition, Block.Getter.Condition.TYPE) === Block.WATER) {
+        // getBlock() throws on an unloaded chunk instead of returning AIR -- e.g. right after a
+        // long-distance teleport/warp landing somewhere not yet generated/loaded. Guard with
+        // isChunkLoaded first rather than let that crash the move-event pipeline.
+        val instance = player.instance
+        if (instance != null &&
+            instance.isChunkLoaded(event.newPosition.blockX() shr 4, event.newPosition.blockZ() shr 4) &&
+            instance.getBlock(event.newPosition, Block.Getter.Condition.TYPE) === Block.WATER
+        ) {
             fallStartY.remove(player.uuid)
             return
         }
