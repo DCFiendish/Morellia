@@ -31,6 +31,7 @@ data class VanillaConfig(
     val musicEnabled: Boolean = true,
     val spawnEnabled: Boolean = true,
     val kothEnabled: Boolean = true,
+    val movementAntiCheatEnabled: Boolean = true,
     // Paths
     val path: String = "vanilla",
     val playerDataPath: String = "playerdata",
@@ -97,4 +98,11 @@ data class VanillaConfig(
     val fireContactTicks: Int = 10,
     val fireDmg: Float = 1f,
     val drowningDmg: Float = 2f,
+    // Movement anti-cheat (baseline speed/fly-hack detection -- see
+    // research-todo/03-anti-cheat-and-security.md). Deliberately generous per-move-event
+    // distance caps, not tick-precise physics, to keep false-positive risk low.
+    val maxHorizontalDistancePerMove: Double = 1.5,
+    val maxHorizontalDistancePerMoveSprintOrSpeed: Double = 2.2,
+    val maxUnsupportedAscentBlocks: Double = 4.0,
+    val maxUnsupportedAscentBlocksJumpBoost: Double = 6.0,
 )
