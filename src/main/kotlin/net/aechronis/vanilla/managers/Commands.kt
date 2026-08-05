@@ -11,20 +11,29 @@ import java.util.concurrent.ConcurrentHashMap
 
 object Commands {
     const val MIRRORED_SLOTS = 41
-    val lastLocation = HashMap<UUID, Pos>()
+    // Plain HashMaps mutated from concurrent per-player command/save/load events (same
+    // bug class already fixed in Elevator/Storage/Mannequin) -- both are also on the
+    // PlayerDataSerializer/Deserializer hot path, read/written on every player save/load.
+    val lastLocation = ConcurrentHashMap<UUID, Pos>()
     val viewing = ConcurrentHashMap<Inventory, Player>()
     val playerLastSender = HashMap<Player, Player>()
-    val ignored = HashMap<UUID, MutableSet<UUID>>()
+    val ignored = ConcurrentHashMap<UUID, MutableSet<UUID>>()
     private val enderChests = ConcurrentHashMap<UUID, Inventory>()
     private val closingEnderChests = ConcurrentHashMap.newKeySet<UUID>()
 
-    fun getIgnored(player: Player): MutableSet<UUID> = ignored.getOrPut(player.uuid) { mutableSetOf() }
+    // getOrPut is a plain get-then-conditional-put even on a ConcurrentHashMap -- no
+    // atomicity guarantee. computeIfAbsent is the atomic equivalent (same fix already
+    // applied to Elevator.getOrScanColumn). The returned set is also swapped from
+    // MutableSet to a concurrent set since callers mutate it in place (see BlocksListener-
+    // style direct add/remove elsewhere in this codebase).
+    fun getIgnored(player: Player): MutableSet<UUID> =
+        ignored.computeIfAbsent(player.uuid) { ConcurrentHashMap.newKeySet() }
 
     fun setIgnored(
         player: Player,
         uuids: Set<UUID>,
     ) {
-        ignored[player.uuid] = uuids.toMutableSet()
+        ignored[player.uuid] = ConcurrentHashMap.newKeySet<UUID>().apply { addAll(uuids) }
     }
 
     fun isBlocked(

@@ -5,10 +5,13 @@ import net.aechronis.vanilla.listeners.RecipesListener
 import net.aechronis.vanilla.objects.Recipe
 import net.aechronis.vanilla.objects.RecipesWorkspace
 import net.minestom.server.inventory.AbstractInventory
+import java.util.concurrent.ConcurrentHashMap
 
 object Recipes {
     val recipes: MutableList<Recipe> = ArrayList()
-    val workspaces: HashMap<AbstractInventory, RecipesWorkspace> = HashMap()
+    // Was a plain HashMap mutated from concurrent per-player inventory open/close/click
+    // events (RecipesListener) -- same bug class already fixed in Elevator/Storage.
+    val workspaces: ConcurrentHashMap<AbstractInventory, RecipesWorkspace> = ConcurrentHashMap()
 
     fun init() {
         // measure load time

@@ -8,10 +8,13 @@ import net.minestom.server.entity.EquipmentSlot
 import net.minestom.server.inventory.Inventory
 import net.minestom.server.inventory.InventoryType
 import net.minestom.server.item.ItemStack
+import java.util.concurrent.ConcurrentHashMap
 
 object Mannequin {
-    val inventories = mutableMapOf<EntityCreature, Inventory>()
-    private val corpses = mutableMapOf<Inventory, EntityCreature>()
+    // Were plain HashMaps mutated from concurrent death/interact/inventory events --
+    // same bug class already fixed in Elevator/Storage/Recipes.
+    val inventories = ConcurrentHashMap<EntityCreature, Inventory>()
+    private val corpses = ConcurrentHashMap<Inventory, EntityCreature>()
 
     fun newLootInventory(deadName: String): Inventory = Inventory(InventoryType.CHEST_6_ROW, Component.text("$deadName's body"))
 
@@ -30,7 +33,7 @@ object Mannequin {
     }
 
     fun despawnIfEmpty(inventory: Inventory): Boolean {
-        if (inventory !in corpses) return false
+        if (!corpses.containsKey(inventory)) return false
         for (slot in 0..<inventory.size) {
             if (!inventory.getItemStack(slot).isAir) return false
         }

@@ -10,6 +10,7 @@ import net.minestom.server.entity.Player
 import net.minestom.server.inventory.Inventory
 import net.minestom.server.inventory.InventoryType
 import net.minestom.server.item.Material
+import java.util.concurrent.ConcurrentHashMap
 
 object Blocks {
     val variants: MutableMap<BlockType, MutableList<Material>> =
@@ -21,7 +22,9 @@ object Blocks {
             BlockType.Plants to mutableListOf(),
         )
 
-    val stonecutters: MutableSet<Inventory> = mutableSetOf()
+    // Was a plain HashSet mutated from concurrent per-player interact/close events
+    // (BlocksListener) -- same bug class already fixed in Elevator/Storage/Recipes/Mannequin.
+    val stonecutters: MutableSet<Inventory> = ConcurrentHashMap.newKeySet()
     val outputsByInput: MutableMap<Material, MutableList<Material>> = mutableMapOf()
 
     fun openConverter(player: Player) {
