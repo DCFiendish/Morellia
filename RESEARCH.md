@@ -10,7 +10,7 @@ Research only — no money spent, no accounts created, no code written yet.
 |---|---|
 | **nodes** | Territory/nation library — direct Kotlin port of `phonon/minecraft-nodes`'s "Frontier Wars" system: `Territory → Town → Nation`, capturable resource nodes (ore/farms/ports), `FlagWar`/siege capture mechanic, plots, alliances. |
 | **nodes-map** | Static JS (deck.gl/Webpack) map viewer that polls JSON (`world.json`, `towns.json`, `war.json`, `buildings.json`) exported by `nodes` — a Dynmap-style overlay, no backend of its own. |
-| **combat** | **Gun + melee combat library** — this is your First Balkan War-era weapons answer, see below. |
+| **combat** | **Gun + melee combat library** — this is your Agadir Crisis-era weapons answer, see below. |
 | **vanilla** | Reimplements standard vanilla MC features Minestom doesn't ship with by default. |
 | **worldedit** | WorldEdit-equivalent for Minestom. |
 | **logger** | Player action logging. |
@@ -23,9 +23,11 @@ Research only — no money spent, no accounts created, no code written yet.
 
 No public "server"/"core"/"proxy" repo exists that ties these into one runnable server for outside consumers — a new server project needs to be scaffolded that depends on `nodes` + `combat` + `vanilla` (+ `utils`) together, following the `library` template's shape. All libraries publish to **GitHub Packages** (`maven.pkg.github.com/Aechronis/...`) at pinned commit-SHA versions, requiring a GitHub token in the consuming project's Gradle repositories block.
 
-## 2. First Balkan War-era PvP — already solved by `Aechronis/combat`
+## 2. Agadir Crisis-era PvP — already solved by `Aechronis/combat`
 
-**Theme decided (2026-08-05): the First Balkan War (1912–1913)** — Balkan League (Serbia, Bulgaria, Greece, Montenegro) vs. the Ottoman Empire. This replaces the earlier generic "musket-era" placeholder framing below; the actual arms of this war are bolt-action repeating rifles (Mauser/Mannlicher/Mosin-family), early Maxim-type machine guns, and horse-drawn field artillery — not flintlock muskets. The technical fit described below (built for a generic slow/period-accurate weapon feel) still holds, just aim the specific stat tuning at this era instead of a black-powder one.
+**Theme decided (2026-08-05, revised same day): the Agadir Crisis (1911), alternate history.** The real 1911 Agadir Crisis was a diplomatic/gunboat standoff over Morocco that got resolved without actual war (France ceded parts of French Equatorial Africa to Germany in exchange for a free hand in Morocco) — this project uses it as the flashpoint for an alternate history where it escalates into real fighting instead. Superseded the earlier First Balkan War framing the same day it was written; the technical facts below carry over unchanged, since 1911 vs. 1912–13 is functionally the same arms technology (bolt-action repeating rifles, early Maxim-type machine guns, horse-drawn field artillery — not flintlock muskets).
+
+**Nation roster** (tier labels and headcount targets given by the user are not being used as a design input, per direct instruction — recorded here purely as the participant list): **Majors** — Germany, France, United Kingdom. **Mediums** — Spain, Italy, Morocco. **Minors** — Switzerland, Portugal, Netherlands, Belgium (the last two included for now, may be cut later). **Open design question**: Morocco was floated as "maybe a subgroup of France most likely" rather than a fully independent power — `nodes`' data model (per §1/§9) is `Territory → Town → Nation` with no vassal/subordinate-nation relationship confirmed anywhere in the source (nations relate to each other only as ally/enemy/neutral, not hierarchically) — so representing Morocco as a France-subordinate polity, if that's the final call, would need either a from-scratch hierarchy concept or a workaround (e.g. Morocco as its own small/weak `Nation` permanently allied to France, not a real parent-child relationship). Not resolved, just flagged.
 
 No need to build a gun plugin from scratch or bolt on an external one (nothing era-specific exists off the shelf anyway — checked Modrinth/Bukkit plugins for reference only). `combat`'s `Gun` is a **data-class item**: every stat (`damage`, `automatic`, `cooldown`, `reloadTime`, `spreadMin/Max`, `recoilMin/Max`, sounds, particles) is a constructor parameter. A period bolt-action rifle is just one `Gun(...)` instance configured as:
 
