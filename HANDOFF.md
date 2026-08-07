@@ -1,167 +1,156 @@
-# Handoff — Morellia session (2026-07-31)
+# Handoff — Morellia project status (2026-08-06)
 
 Deep background (library internals, design rationale) is in `RESEARCH.md`, `NODES_DEEP_DIVE.md`,
 `VANILLA_DEEP_DIVE.md`, `COMBAT_DEEP_DIVE.md`, and `research-todo/*.md` — not repeated here. This
-doc is: what's blocking right now, what changed this session, and the credentials/IDs needed to
-keep going without re-discovering them.
+doc is: what's actually live in production right now, what changed most recently, and the
+credentials/IDs needed to keep going without re-discovering them.
 
-## 🔴 Immediate blocker
+Supersedes the old 2026-07-31 version of this file and folds in `WARFLAG_HANDOFF.md` (deleted —
+that entire thread, including the flat two-territory dev fixture it was written around, is now
+fully resolved and superseded by the real territory data described below).
 
-**Oracle box (0.0.0.0) has degraded connectivity for sustained transfers.** Confirmed
-this session:
-- Raw TCP connect to port 25567 succeeds instantly from my machine.
-- `scp` of a 49MB file to the box fails with "Connection reset by peer" on 4/4 attempts (tried
-  plain, `-C` compression, keepalive options, hard timeout — all failed the same way).
-- GitHub Actions runners (used for load-test bots) can complete a TCP connect but never finish
-  the Minecraft login handshake — zero join events reach the server's log, confirmed against
-  both the new bot code AND the unmodified pre-session bot commit (ruling out a code bug).
+## Theme: the Agadir Crisis (1911), alternate history — locked in
 
-Likely cause: Oracle's automatic flood/DDoS protection throttling after the 350-bot load test
-burst earlier this session. Typically self-clears on a cooldown (untested how long — try again
-first before assuming it's something else).
+The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically
+without war) is reimagined here as escalating into real fighting. Ten nations: **Germany, France,
+United Kingdom, Spain, Italy, Morocco, Switzerland, Netherlands, Belgium, Portugal.** Weapons era
+is bolt-action rifles, early Maxim-type machine guns, horse-drawn field artillery — `Aechronis/combat`'s
+`Gun`/`Melee`/`Vehicle` data classes cover this directly (see `RESEARCH.md` §2), no new combat code
+needed for the era fit.
 
-**First thing to do in the next session: retry the deploy below. If it works, the blocker was
-just the cooldown and everything after this point in the doc is ready to run as-is.**
+## World: real trimmed terrain, live in production
 
-## Access / credentials
+The server no longer runs on a flat stone test world. A real Minecraft Anvil world (sourced from a
+"Rise of Rome" terrain download covering Europe, trimmed to a box spanning Britain through Morocco
+— roughly `x: -8192..2559, z: -5632..3071` in block coordinates) is loaded via `AnvilLoader` in
+[server/src/main/kotlin/net/morellia/server/AgadirWorld.kt](server/src/main/kotlin/net/morellia/server/AgadirWorld.kt),
+wired into `Main.kt`. Anything outside the trimmed box falls through to `StoneFlatTerrain`'s
+generator (flat stone), so the world never has unrendered holes.
+
+Spawn is `(-3000.5, 70.0, -1500.5)` (central France, verified on solid ground — the earlier flat-world
+test coordinate was over water in real terrain and was replaced).
+
+**Why Anvil directly, not Polar** (updates the recommendation in
+`minestom-server-setup/04-world-generation-and-persistence.md`): the original research recommended
+converting to Polar for production. In practice the trimmed box was loaded straight via `AnvilLoader`
+with no conversion step — simpler pipeline (no `AnvilPolar` conversion needed), and the trimmed
+world's size (~1.5GB) hasn't shown a load-time problem worth the extra conversion step. Revisit only
+if Anvil's slower load time becomes a measured problem.
+
+## Borders: 1911 territories drawn and deployed (rebuilt 2026-08-06, v2)
+
+All ten nations have real in-game territory. This is the second full pipeline — the first version
+(grid-cell tiling on hand-typed border polygons) shipped, then got replaced same-day after feedback
+that territories looked like a repeating grid/diamond lattice, had a coastal chunk misclassified as
+"land" that sealed off the whole North Sea/Channel from ocean-flood-fill (so a ~7,300-chunk sea pocket
+got claimed as territory), and had nation borders that were only roughly historically accurate.
+Current pipeline (all scratchpad tooling, not committed):
+
+1. **Borders**: real geodata, not hand-typed polygons. Natural Earth 1:50m admin-0 country boundaries,
+   clipped to the trimmed box's lat/lon extent (33–58.5°N, -10–14.5°E) and simplified to ~0.008°
+   (below chunk resolution). Alsace-Lorraine carved from France into Germany using the real Bas-Rhin/
+   Haut-Rhin/Moselle French department boundaries (`gregoiredavid/france-geojson`) as the standard
+   modern proxy for the 1871–1918 annexed territory. UK = Great Britain + Northern Ireland + all of
+   Ireland (Channel Islands/Isle of Man correctly excluded, they were never part of the UK). ~3,800
+   polygon vertices total vs. ~150 in the original hand-typed version.
+2. **Land/water classification**: every chunk in the trimmed box sampled for land vs. water (181,960
+   land, 155,961 water). Enclosed water reachable from the box's outer edge is real ocean; anything
+   else is flood-filled and folded into land *unless* the enclosed pocket exceeds ~500 chunks (real
+   lakes here top out around 100–180, so anything bigger is a sea/strait/bay that got falsely dammed
+   by a single mis-sampled coastal chunk, not an actual lake) — that's the North Sea fix.
+3. **Country assignment**: point-in-polygon against the real borders, same as before.
+4. **Tiling**: geodesic (graph-distance, not straight-line) multi-source Dijkstra partition over the
+   chunk adjacency graph, seeded densely (~48-chunk initial cells) then merged up to the 75–115 target
+   using a merge-candidate scorer that directly optimizes shape (inverse of `n/(π·max_reach²)` for
+   spikes, `1 − area/convex_hull_area` for bends/crescents) — and refuses to force a merge that would
+   produce a bad shape, leaving a piece undersized instead. Straight Euclidean-distance Voronoi was
+   tried first and rejected: it ignores real land connectivity, so a seed near a winding coast can
+   "claim" a strand of chunks that's only close by straight line, producing long coastal tendrils.
+   Validated against `Aechronis/nodes-map`'s own committed real-server `world.json`: same-size-range
+   solidity (area vs. convex hull) is 0.845 median / 0.576 worst-case here, vs. 0.834 median / 0.164
+   worst-case there — on par with or better than actual production territory shapes.
+5. **Output**: 1,564 territories, generated into `nodes` `world.json`/`towns.json` (one town+nation
+   per country, capital-nearest home territory, verified on-land spawn per nation) the same way as
+   before.
+
+Deployed via the usual stop→swap→start sequence (see gotchas below); pre-deploy `.bak` copies exist
+both on the Pterodactyl volume and in `/opt/nodes-map/nodes/` as
+`{world,towns}.json.pre-compact-real-borders.bak`, alongside the original
+`{world,towns}.json.pre-agadir-borders-backup` from the very first (flat-world) territory rollout.
+
+**Known limitation, accepted not fixed**: Portugal's territory count is low (~234 chunks) because its
+real westernmost coast sits right at the trimmed box's already-confirmed western edge — genuine
+geography, not a bug. Re-trimming the world to include more of Portugal would be a large, disruptive,
+unrequested change; not doing it unless asked.
+
+**Open, not yet decided**: all ten nations currently start neutral — no alliance/enemy relationships
+are pre-set. Morocco's "maybe subordinate to France" idea (RESEARCH.md §2) is still just a flagged
+design question, not resolved — `nodes`' data model has no vassal/parent-nation concept, only
+ally/enemy/neutral between equal `Nation`s.
+
+## nodes-map: live territory viewer
+
+`DCFiendish/nodes-map` (fork of `Aechronis/nodes-map`) is built and deployed to the production VM at
+`http://0.0.0.0:8888`, served via a systemd unit (`nodes-map.service`, `python3 -m http.server
+8888` from `/opt/nodes-map`). `js/app.js`'s `PAN_BOUNDS` was updated to the real trimmed-box extent.
+Firewalled open at both the Oracle NSG layer and the VM's own iptables (`netfilter-persistent`
+persisted) — both layers required, opening one alone doesn't make the port reachable. It currently
+shows territory-color overlays only, no base terrain tile imagery (that would need a rendered webp
+tile pyramid — not built, flagged as a future nice-to-have, not requested).
+
+## Access / credentials (unchanged from before)
 
 - **SSH to the Oracle box**: `ssh -i C:\Users\USER\.ssh\id_ed25519 ubuntu@0.0.0.0`
-  (same keypair as the [HOSTING-BUSINESS-NAME] business, per `minecraft-hosting` skill — this is a
-  separate Oracle instance from bmwoo though, don't confuse the two).
-- **GitHub**: `gh` CLI is already authenticated as `DCFiendish` via OS keyring (`gh auth status`
-  confirms it, no token needed in this doc). Repos:
-  - `DCFiendish/nodes` — fork of `Aechronis/nodes`, local clone at
-    `C:\Users\USER\Minecraft Dev\aechronis\nodes-lib`
-  - `DCFiendish/vanilla` — fork of `Aechronis/vanilla`, local clone at
-    `C:\Users\USER\Minecraft Dev\aechronis\vanilla`
-  - `DCFiendish/rust-mc-bot` — fork of `Eoghanmc22/rust-mc-bot`, local clone at
-    `C:\Users\USER\Minecraft Dev\aechronis\rust-mc-bot`
-  - `Aechronis/utils`, `Aechronis/combat` — used directly, not forked, no local changes.
-- **GitHub Packages token** (for Gradle to pull the forked libs): already configured at
-  `C:\Users\USER\.gradle\gradle.properties` as `gpr.user`/`gpr.token` — works, no action needed,
-  not duplicating the raw value here since that file already has it.
-- **Pterodactyl panel for this box**: not used this session (deployed via direct SSH/docker
-  instead) — no login captured here. If needed, check with the user.
-- **No Pterodactyl API key was used or captured this session.**
-- ⚠️ **`C:\Users\USER\Aechronis` (the server module) is not a git repo.** No version history,
-  no remote backup — just local disk + whatever jar is currently deployed. Worth raising with the
-  user if this project is going to keep growing.
+- **This is the user's own Oracle VM** ([HOSTING-BUSINESS-NAME] business), shared by multiple of the user's
+  own projects — `REDACTED-PROJECT-2`, `morellia` (this project), `REDACTED-PROJECT` — plus at least one other
+  tenant's service the user has hosted as a favor ("REDACTED-THIRDPARTY-SERVICE" on port 8090, not part of this
+  project, never modified — only ever viewed read-only to identify what was already running on the
+  shared box before picking nodes-map's own port). **Do not touch anything on this box beyond
+  Morellia's own container/files without explicit confirmation** — it is genuinely multi-tenant.
+- **GitHub**: `gh` CLI already authenticated as `DCFiendish`. Repos:
+  - `DCFiendish/nodes` — fork of `Aechronis/nodes`
+  - `DCFiendish/vanilla` — fork of `Aechronis/vanilla`
+  - `DCFiendish/nodes-map` — fork of `Aechronis/nodes-map`, new this session
+  - `DCFiendish/rust-mc-bot` — fork of `Eoghanmc22/rust-mc-bot`
+  - `Aechronis/utils`, `Aechronis/combat` — used directly, not forked, no local changes
+- **GitHub Packages token**: `C:\Users\USER\.gradle\gradle.properties` (`gpr.user`/`gpr.token`)
+- **This repo (`C:\Users\USER\Aechronis`) is a real git repo now** (was flagged as a gap in the old
+  version of this doc — resolved, it's tracked and pushed).
 
-## Server identifiers (re-verify container ID — it's not stable across restarts)
+## Server identifiers
 
 - Pterodactyl server UUID: `00000000-0000-0000-0000-000000000000`
-- Volume path: `/var/lib/pterodactyl/volumes/00000000-0000-0000-0000-000000000000` → mounted at
-  `/home/container` in the container
-- Docker container ID as of this session: `79869340c7bb` — **re-fetch via
-  `sudo docker ps` rather than trusting this**, it changes on restart
-- Port: 25567 (tcp + udp), offline-mode auth (`Auth.Offline()`), so any bot username works
-- `server.jar` inside the volume is owned by uid/gid `998:998` — after copying in a new jar,
-  `chown 998:998` it or the container won't start
+- Volume path: `/var/lib/pterodactyl/volumes/00000000-0000-0000-0000-000000000000` → `/home/container`
+  in the container
+- Docker container ID changes across restarts — always re-fetch via `sudo docker ps`, never reuse
+  one from a prior session; verify by volume UUID, not by assuming the first `docker ps` row is
+  Morellia (this box runs multiple containers)
+- Port: 25567 (tcp + udp), offline-mode auth (`Auth.Offline()`)
+- `server.jar` inside the volume is owned by uid/gid `998:998`
 
-## What's done and deployed (working, confirmed)
+## Gotchas worth remembering (also in `.claude/skills/morellia-ops/SKILL.md`)
 
-- `nodes` fork pinned at `be9e9c3`, `vanilla` fork pinned at `2bf2689` in
-  `server/build.gradle.kts` — ~15 M/LOW correctness bugs fixed (permissions, plots, war-save
-  races, ore sampling, etc.) and a systemic off-main-thread chunk/entity mutation bug class fixed
-  across 6 vanilla managers (Crops, Saplings, TreeFeller, EnvironmentalDamage, Food, Combat).
-  Both published and load-tested clean.
-- Load tests run this session against the *currently deployed* jar (i.e. before this session's
-  newest changes below): 20 bots ✓, ~150 bots ✓, 350 bots ✓ — all clean joins, 0 kicks/errors,
-  steady 20.0 tps throughout. This validated general connection capacity and the vanilla
-  per-player fixes, but **never touched nodes' war system** (no flag placement, no beacon
-  render, no minimap war-broadcast, no real combat/loot) — that gap is what the work below
-  is for.
-- `TickMonitor.kt` — rolling tick-time/TPS logger, already live, logs every 5s to the
-  container's stdout (`[TickMonitor] avg tick: ...ms (~...tps), max tick: ...ms, over ... ticks`).
+- **Never `docker restart` right after hand-editing `nodes`' own JSON save files**
+  (`world.json`/`towns.json`/`war.json`) — the old process's shutdown hook silently re-saves its
+  stale in-memory state over whatever you just deployed. Use `stop` (confirm it actually exited),
+  deploy, then `start`.
+- **Oracle NSG rules AND the VM's own iptables INPUT chain both gate inbound traffic
+  independently** — opening a port needs a rule at both layers, confirmed the hard way while
+  standing up nodes-map's port 8888.
+- **`oci network security-list update --ingress-security-rules` replaces the whole rule list**, not
+  an incremental add — always fetch-and-append the full existing rule set before submitting.
 
-## What's built but NOT yet deployed (this is the actual next step)
+## What's genuinely still open (not urgent, not touched recently)
 
-Built in response to the user's realism question about war-load testing ("how realistic is this
-to actual players doing a war"). Scope was agreed as Phase 1 (flag placement) + Phase 3 (burst
-multi-attacker load), explicitly deferring Phase 2 (real combat/damage — needs entity tracking
-the bot doesn't have) as lower priority.
-
-1. **`rust-mc-bot` — commit `436856c`, already pushed to `DCFiendish/rust-mc-bot` master, CI
-   build verified green.** Adds `write_block_place()` (packet ID `0x42`,
-   `ClientPlayerBlockPlacementPacket`) and makes ~25% of bots (`bot.id % 4 == 0`) place one fence
-   "war flag" each, once, split into two attacking factions by bot-id parity, targeting hardcoded
-   block coordinates inside the two test territories (see below).
-
-2. **`server/src/main/kotlin/net/morellia/server/LoadTestBots.kt` — new file, written, compiles
-   clean, NOT yet on the server.** Test-only scaffolding: on `PlayerSpawnEvent`, if the player's
-   name matches `Bot_<n>`, auto-enlists them into "Testville" (even n) or "Secondtown" (odd n) via
-   `Town.addResident`, and gives them an `OAK_FENCE` directly in hotbar slot 0
-   (`player.inventory.setItemStack(0, ...)`). This sidesteps needing the bot to speak Minestom's
-   chat-command or creative-inventory-slot protocol itself — town membership and the flag item are
-   granted server-side instead. Wired into `Main.kt` via `LoadTestBots.init()`.
-
-3. **Jar is already built locally**: `C:\Users\USER\Aechronis\server\build\libs\morellia-server.jar`
-   (built 2026-07-31, ~49MB). **This is what's stuck trying to deploy — see blocker above.**
-
-### To finish once the connectivity blocker clears
-
-```bash
-scp -i ~/.ssh/id_ed25519 "C:\Users\USER\Aechronis\server\build\libs\morellia-server.jar" ubuntu@0.0.0.0:/tmp/morellia-server-new.jar
-ssh -i ~/.ssh/id_ed25519 ubuntu@0.0.0.0 "sudo cp /tmp/morellia-server-new.jar /var/lib/pterodactyl/volumes/00000000-0000-0000-0000-000000000000/server.jar && sudo chown 998:998 /var/lib/pterodactyl/volumes/00000000-0000-0000-0000-000000000000/server.jar && rm /tmp/morellia-server-new.jar"
-# restart via Pterodactyl, or: ssh ... "sudo docker restart <current-container-id>"
-# verify: ssh ... "sudo docker logs --tail 20 <container-id>" -- look for "Morellia test server ready"
-```
-
-Then run the actual test:
-```bash
-gh workflow run "Load test" --repo DCFiendish/rust-mc-bot -f target=0.0.0.0:25567 -f count=20 -f duration_seconds=60
-```
-Start small (~20 bots, so ~5 attackers) before scaling up — this whole path is unverified
-end-to-end against a live server (deployment was blocked before it could be tested). Watch for:
-- Bot-side log: `"bot \"Bot_N\" placing war flag at (x, y, z)"` lines
-- Server-side `docker logs`: either `[War] ... is attacking ...` broadcasts (success) or one of
-  `ErrorChunkNotEdge` / `ErrorSkyBlocked` / `ErrorFlagTooHigh` / `ErrorAlreadyUnderAttack` /
-  `[War] Cannot claim unless you are part of a town` (would mean the `LoadTestBots.kt` town
-  assignment didn't take — check `Town.fromName` actually found "Testville"/"Secondtown" before
-  digging further)
-- Note the concurrency ceiling: only 4 chunks per territory (8 total), and nodes allows one
-  active attack per chunk — more than 8 real attackers will mostly just hit
-  `ErrorAlreadyUnderAttack`, not add real load. That's a test-world content limit, not a bug.
-
-### Test-world layout (for context, from `server/world.json`)
-
-Flat world (`fillHeight(0, 60, STONE)` — solid ground at Y≤59, clear air/sky above). Two
-territories, `chunkAttackTime` overridden to 7500ms in `Main.kt` for fast capture during testing
-(intentionally NOT reverted — see comment in `Main.kt`):
-- **Testville**: chunks (0,0)(1,0)(0,1)(1,1) → flag targets used: (8,59,8) (24,59,8) (8,59,24)
-  (24,59,24), block placed at Y=60
-- **Secondtown**: chunks (5,0)(6,0)(5,1)(6,1) → flag targets: (88,59,8) (104,59,8) (88,59,24)
-  (104,59,24)
-
-## Hard-won reference: confirmed packet IDs for this exact Minestom build
-
-Build: `net.minestom:minestom:2026.07.12-26.2` (protocol version **776**, NOT upstream's default
-772 — confirmed by decompiling `HandshakeListener`). These drifted from wiki.vg/upstream
-defaults; all confirmed by decompiling the actual jar (`javap -p -c -constants` on
-`PacketVanilla.class` and each packet class), not assumed. Jar location for re-deriving more if
-needed:
-```
-C:\Users\USER\.gradle\caches\modules-2\files-2.1\net.minestom\minestom\2026.07.12-26.2\6f3c57e244ee008e99156456d949437108db42cc\minestom-2026.07.12-26.2.jar
-```
-
-| Packet | ID | Used? |
-|---|---|---|
-| ClientTeleportConfirmPacket | 0x00 | yes |
-| ClientCommandChatPacket (slash commands) | 0x07 | found, not used (town assignment moved server-side instead) |
-| ClientChatMessagePacket | 0x09 | yes |
-| ClientKeepAlivePacket | 0x1C | yes |
-| ClientPlayerPositionAndRotationPacket | 0x1F | yes |
-| ClientPlayerActionPacket (dig) | 0x29 | yes |
-| ClientEntityActionPacket (sneak/sprint) | 0x2A | yes |
-| ClientHeldItemChangePacket | 0x35 | yes |
-| ClientAnimationPacket (swing) | 0x3F | yes |
-| ClientCreativeInventoryActionPacket | 0x38 | found, NOT used — item-registry protocol ID + component encoding was judged too fragile to hand-roll blind; used server-side `player.inventory.setItemStack()` instead |
-| ClientPlayerBlockPlacementPacket (place block) | 0x42 | yes, new this session |
-
-## Other pending items (not urgent, not touched this session)
-
-- Task #13 from the standing list: replace nodes-map loading screen logo with Morellia branding —
-  blocked on the user producing artwork.
-- Phase 2 (real combat/damage in the load-test bot) was explicitly scoped but deferred — would
-  need the bot to parse entity-spawn packets to get target entity IDs, meaningfully more work
-  than Phase 1/3.
+- Alliance/enemy relationships between the 10 nations (currently all neutral).
+- Stale `LoadTestBots.kt` / `rust-mc-bot` attack-target coordinates from the old flat test world —
+  superseded now that real territories exist; would need regenerating against the real map if
+  load-testing the war system again.
+- Portugal's clipped territory (see above) — accepted limitation, not planned to fix.
+- A real webp tile-imagery base layer for `nodes-map` (currently overlay-only).
+- Morocco's nation-hierarchy question (see above).
+- `War-Comms` GitHub repo (empty, 0 bytes) — `gh` lacked the `delete_repo` scope to remove it via
+  API; user would need `gh auth refresh -h github.com -s delete_repo` or delete it manually via the
+  GitHub UI. Unconfirmed whether this was ever done — check before assuming either way.
+- Task #13 from an earlier session's list: replace the nodes-map loading-screen logo with Morellia
+  branding — blocked on the user producing artwork.

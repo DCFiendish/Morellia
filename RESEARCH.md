@@ -2,6 +2,8 @@
 
 Research only — no money spent, no accounts created, no code written yet.
 
+> **Status note (2026-08-06):** this doc is early-stage research from before real implementation work began, kept for the design rationale. The server itself is well past this stage now — real code is written and deployed to production (real Agadir-Crisis-trimmed terrain, drawn 1911 national borders/territories, a live `nodes-map` viewer). See `HANDOFF.md` for the current status.
+
 ## 1. What the Aechronis org actually is
 
 `github.com/Aechronis` is a set of **Kotlin libraries for Minestom** (not a single server project). Minestom is a from-scratch, lightweight Java Minecraft server framework — no Bukkit/Paper plugin ecosystem, no default gameplay. You build one server binary yourself and wire in libraries as Gradle dependencies.

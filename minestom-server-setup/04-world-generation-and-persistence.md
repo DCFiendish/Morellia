@@ -24,10 +24,30 @@ The project's own benchmarks show large gains — roughly ~9.65s/iteration for A
 
 Sources: [polar repo](https://github.com/hollow-cube/polar), [FORMAT.md](https://github.com/hollow-cube/polar/blob/main/FORMAT.md), [PolarConverter](https://github.com/BitByLogics/PolarConverter).
 
-## Recommendation, and how it fits this project
+## What was actually shipped (2026-08-06) — Anvil directly, not Polar
 
-- **Procedural `Generator`** for infinite/ephemeral worlds — not the fit for the nations/territory game, which needs a real, hand-designed, persistent, bounded map (per the map-design discussion in [../RESEARCH.md](../RESEARCH.md) — theme now decided as the Agadir Crisis (1911, alternate history), see `research-todo/00-index.md`; exact map dimensions still open). The user has an existing real-world Europe terrain download (~1.4GB, real-world scale roughly 1:500–1:750) that's the current candidate source for this, confirmed to cover Western Europe through Morocco/North Africa — being trimmed down to the relevant nations rather than used at its full continent-spanning extent.
-- **Polar** for the actual world once you design it — this is the community-favored production path for exactly what this project needs: a real, hand-built, persistent, explorable map, not something regenerated on every boot. Its "whole file loads at once, not built for huge open worlds" caveat is worth keeping in mind when you get to sizing the map — a genuinely enormous continent (e.g. the literal full-scale Europe download before trimming) might push against Polar's sweet spot, in which case Anvil (with its slower but truly chunk-random-access model) could become the better fit despite the load-time cost. The planned trim (Western Europe + Morocco, not the whole continent) should land comfortably within Polar's sweet spot at this map's scale — worth confirming once the actual trimmed dimensions are final.
-- **Anvil** mainly for one-off conversion (e.g., if the map gets built in vanilla Minecraft/WorldEdit first, then converted to Polar via `AnvilPolar` for actual production use), or if true random per-chunk access at very large world sizes turns out to matter more than Polar's speed advantage.
+**Decision reversed from the original recommendation below.** The real map — a "Rise of Rome" Europe
+terrain download, trimmed to a box spanning Britain through Morocco (`x: -8192..2559, z:
+-5632..3071` in block coordinates, confirmed by direct landmark inspection: Gibraltar Strait, Dover
+Strait) — is loaded straight via `AnvilLoader` in production
+([`server/AgadirWorld.kt`](../server/src/main/kotlin/net/morellia/server/AgadirWorld.kt)), with
+**no conversion to Polar**. Reasoning: the trimmed box (~1.5GB) never showed a measured load-time
+problem worth the extra `AnvilPolar` conversion step in practice — the "genuinely enormous
+continent" caveat flagged below turned out not to apply once the map was actually trimmed down to
+the ten-nation box rather than kept at full-continent scale. A `Generator` fallback
+(`StoneFlatTerrain`) still covers anything outside the trimmed box, so `setChunkLoader` +
+`setGenerator` are both wired on the instance — the loader takes priority per chunk, the generator
+only fires for chunks it has no data for.
 
-**Relevant to the hub/world-server split** (RESEARCH.md §8): the hub shard(s) are small, static lobby spaces — an obvious fit for Polar regardless of what the flagship world shard ends up using, given Polar's explicit design target of "small/instanced maps."
+**Revisit Polar only if Anvil's load time becomes a measured problem** (e.g. if the box needs to
+grow substantially, or cold-start time at scale becomes noticeable) — the conversion path
+(`AnvilPolar.anvilToPolar` + `PolarWriter.write`) documented above is still the right tool for that
+if it's ever needed.
+
+## Original recommendation (superseded above for the flagship world; still applies to hub shards)
+
+- **Procedural `Generator`** for infinite/ephemeral worlds — not the fit for the nations/territory game, which needs a real, hand-designed, persistent, bounded map. This is what the trimmed-box terrain now covers; the generator's remaining role is purely the out-of-bounds flat-stone fallback described above.
+- **Polar** was the original production recommendation for the flagship world — superseded above. Its "whole file loads at once, not built for huge open worlds" caveat is still worth keeping in mind for any *other* map this project builds — e.g. hub/lobby worlds, per the note below.
+- **Anvil** — turned out to be the actual production choice for the flagship world's real terrain, not just a one-off conversion step, per the decision above.
+
+**Relevant to the hub/world-server split** (RESEARCH.md §8): the hub shard(s) are small, static lobby spaces — Polar is still a good fit there regardless of the flagship world's Anvil choice, given Polar's explicit design target of "small/instanced maps." Hub shards don't exist yet, so this is unbuilt, not contradicted by the flagship's Anvil decision.
