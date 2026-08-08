@@ -142,6 +142,16 @@ tile pyramid — not built, flagged as a future nice-to-have, not requested).
 
 ## What's genuinely still open (not urgent, not touched recently)
 
+- **`combat`'s CRITICAL/HIGH bugs are still live** (async unsynchronized explosion terrain mutation,
+  reload ammo-theft dupe, raycast wall-passthrough, no melee reach check, explosion ignoring
+  line-of-sight — see `COMBAT_DEEP_DIVE.md`). Unlike `nodes`/`vanilla` (both forked, and both had
+  essentially every CRITICAL/HIGH finding from their deep-dives fixed by 2026-08-05 — see each fork's
+  README), `combat` is consumed directly from upstream `Aechronis/combat`, unforked, per project
+  convention — upstream's recent commits are vehicle-mechanics fixes, not these. This is the single
+  biggest concrete correctness gap left before real PvP/vehicle playtesting; needs either forking
+  `combat` too (a policy change) or these fixed upstream. See
+  `research-todo/01-concurrency-model.md` (resolved 2026-08-06) for the thread-safety model these
+  bugs were triaged against.
 - Alliance/enemy relationships between the 10 nations (currently all neutral).
 - Stale `LoadTestBots.kt` / `rust-mc-bot` attack-target coordinates from the old flat test world —
   superseded now that real territories exist; would need regenerating against the real map if

@@ -30,7 +30,7 @@ Master checklist for everything worth resolving before real server scaffolding b
 
 ## New research write-ups in this folder
 
-1. [`01-concurrency-model.md`](01-concurrency-model.md) — **the single biggest unresolved question.** All three deep-dive docs independently flag inconsistent thread-safety fixes and none of them ever nails down what Minestom actually guarantees. Do this first — it changes how you triage everything else.
+1. [`01-concurrency-model.md`](01-concurrency-model.md) — **RESOLVED 2026-08-06**, including the command-threading question that was the last open piece (confirmed from Minestom's own source, not just docs: commands share the exact same per-player tick-thread guarantee as events). All three deep-dive docs' thread-safety findings can now be triaged with a definitive answer instead of an inference.
 2. [`02-cross-library-integration.md`](02-cross-library-integration.md) — the seams between `combat`/`nodes`/`vanilla`/`utils` that no single per-library doc owns.
 3. [`03-anti-cheat-and-security.md`](03-anti-cheat-and-security.md) — consolidates the anti-cheat gaps scattered across `RESEARCH.md` §10 and the three deep-dives into one buildable list.
 4. [`04-world-and-data-architecture.md`](04-world-and-data-architecture.md) — map/world-height decisions plus reconciling the aspirational Redis/Mongo architecture against the current JSON/NBT/H2 reality.
@@ -42,8 +42,8 @@ Master checklist for everything worth resolving before real server scaffolding b
 
 ## Suggested execution order
 
-1. `01-concurrency-model.md` — unblocks correct triage of nearly every bug in the three deep-dive docs.
-2. CRITICAL/HIGH items in `COMBAT_DEEP_DIVE.md`, `NODES_DEEP_DIVE.md`, `VANILLA_DEEP_DIVE.md`, plus `RESEARCH.md` §11's ore double-drop bug — these are launch-blocking correctness bugs, not research questions, so "research" here means confirm-repro-and-scope-the-fix.
+1. ~~`01-concurrency-model.md`~~ — **resolved 2026-08-06.**
+2. CRITICAL/HIGH items in `COMBAT_DEEP_DIVE.md`, `NODES_DEEP_DIVE.md`, `VANILLA_DEEP_DIVE.md`, plus `RESEARCH.md` §11's ore double-drop bug — launch-blocking correctness bugs, not research questions. **`nodes` and `vanilla` (both forked) are effectively done here as of 2026-08-05** — essentially every CRITICAL/HIGH finding in both docs has been fixed and is live in the pinned fork commits (`server/build.gradle.kts`); see each fork's README for the categorized list. **`combat` (unforked, consumed directly from upstream `Aechronis/combat`) is not** — its CRITICAL findings (async unsynchronized explosion terrain mutation, reload ammo-theft dupe, raycast wall-passthrough, no melee reach check, explosion ignoring line-of-sight) remain live upstream; recent upstream commits there are vehicle-mechanics fixes, not these. This is now the single biggest concrete correctness gap in the stack — either fork `combat` too (policy change) or get these fixed upstream before combat sees real playtesting.
 3. ~~`RESEARCH.md` §4's Oracle billing ambiguity~~ — **resolved 2026-07-30**, confirmed with Oracle support: PAYG tenancies keep the full 4 OCPU/24GB Always Free A1 allotment. See `05-hosting-and-ops.md`.
 4. `03-anti-cheat-and-security.md`, `RESEARCH.md` §12 (combat-tag), `06-economy-and-progression.md`, `07-community-and-onboarding.md` — the genuine from-scratch design work.
 5. `04-world-and-data-architecture.md`'s world-gen/map-design section is now resolved (2026-08-06); its persistence-architecture (Redis/Mongo reconciliation) half and `02-cross-library-integration.md` are still needed before scaffolding `world-server`/`hub-server` for real.
