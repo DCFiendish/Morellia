@@ -100,7 +100,7 @@ object Saplings {
         corner: Vec,
         type: SaplingType,
     ): Boolean {
-        if (!hasGiantClearance(instance, corner, type.giantHeight)) return false
+        if (!hasLogClearance(instance, corner, type, giant = true)) return false
 
         val builder =
             BlockTreeBuilder(
@@ -121,22 +121,6 @@ object Saplings {
         return true
     }
 
-    private fun hasGiantClearance(
-        instance: Instance,
-        corner: Vec,
-        height: Int,
-    ): Boolean {
-        for (dx in 0..1) {
-            for (dz in 0..1) {
-                for (i in 1..height) {
-                    val b = instance.getBlock(corner.blockX() + dx, corner.blockY() + i, corner.blockZ() + dz)
-                    if (!b.isAir) return false
-                }
-            }
-        }
-        return true
-    }
-
     fun grow(
         key: BlockKey,
         planted: SaplingsPlanted,
@@ -145,7 +129,7 @@ object Saplings {
         val pos = key.pos
         if (!instance.getBlock(pos).compare(planted.type.saplingBlock)) return true
 
-        if (!hasClearance(instance, pos, planted.type.height)) return false
+        if (!hasLogClearance(instance, pos, planted.type, giant = false)) return false
 
         val builder =
             BlockTreeBuilder(
@@ -161,20 +145,61 @@ object Saplings {
         return true
     }
 
-    private fun hasClearance(
+    private fun hasLogClearance(
         instance: Instance,
-        pos: Vec,
-        height: Int,
+        base: Vec,
+        type: SaplingType,
+        giant: Boolean,
     ): Boolean {
-        val x = pos.blockX()
-        val z = pos.blockZ()
-        for (i in 1..height) {
-            if (!instance.getBlock(x, pos.blockY() + i, z).isAir) return false
+        val checker =
+            LogClearanceTreeBuilder { dx, dy, dz ->
+                val block = instance.getBlock(base.blockX() + dx, base.blockY() + dy, base.blockZ() + dz)
+                val replacesSourceSapling =
+                    dy == 0 &&
+                        if (giant) {
+                            dx in 0..1 && dz in 0..1 && block.compare(type.saplingBlock)
+                        } else {
+                            dx == 0 && dz == 0 && block.compare(type.saplingBlock)
+                        }
+                block.isAir || replacesSourceSapling
+            }
+
+        if (giant) {
+            type.buildGiant(checker)
+        } else {
+            type.build(checker)
         }
-        return true
+        return checker.hasClearance
     }
 
     private fun isLeaf(block: Block): Boolean = block.name().endsWith("_leaves")
+
+    private class LogClearanceTreeBuilder(
+        private val isClear: (Int, Int, Int) -> Boolean,
+    ) : TreeBuilder {
+        var hasClearance = true
+            private set
+
+        override fun log(
+            dx: Int,
+            dy: Int,
+            dz: Int,
+        ) {
+            if (!isClear(dx, dy, dz)) hasClearance = false
+        }
+
+        override fun leaf(
+            dx: Int,
+            dy: Int,
+            dz: Int,
+        ) = Unit
+
+        override fun leafLayer(
+            dy: Int,
+            radius: Int,
+            trimCorners: Boolean,
+        ) = Unit
+    }
 
     private class BlockTreeBuilder(
         private val instance: Instance,
