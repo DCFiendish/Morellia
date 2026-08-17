@@ -288,12 +288,32 @@ object WaypointMenu {
                 sharing,
             ).onSuccess { waypoint ->
                 Message.print(player, "Created waypoint ${waypoint.name} at ${waypoint.x}, ${waypoint.y}, ${waypoint.z}")
+                if (waypoint.sharing != WaypointSharing.PRIVATE) announceSharedWaypoint(session.resident, waypoint)
             }.onFailure { failure ->
                 retryCreateDialog(player, session, inputName, inputX, inputY, inputZ, inputSharing, failure.message)
             }
         }.onFailure { failure ->
             retryCreateDialog(player, session, inputName, inputX, inputY, inputZ, inputSharing, failure.message)
         }
+    }
+
+    /** Notifies everyone the waypoint is shared with (besides its creator) where it is. */
+    private fun announceSharedWaypoint(owner: Resident, waypoint: Waypoint) {
+        val scopeLabel = when (waypoint.sharing) {
+            WaypointSharing.TOWN -> "town"
+            WaypointSharing.NATION -> "nation"
+            WaypointSharing.ALLY -> "ally"
+            WaypointSharing.PRIVATE -> return
+        }
+        // Waypoint names allow arbitrary printable characters, including the legacy
+        // formatting-code prefix '§'; strip it so a waypoint name can't inject color/style
+        // codes into a message broadcast to everyone it's shared with.
+        val safeName = waypoint.name.replace("§", "")
+        val message = "[Nodes] ${owner.name} shared a $scopeLabel waypoint: \"$safeName\" @ ${waypoint.x}, ${waypoint.y}, ${waypoint.z}"
+        Nodes.residents.values.asSequence()
+            .filter { resident -> resident !== owner && waypoint.isSharedWith(resident) }
+            .mapNotNull { resident -> resident.player() }
+            .forEach { recipient -> Message.print(recipient, message) }
     }
 
     private fun retryCreateDialog(
