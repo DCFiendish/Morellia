@@ -102,6 +102,7 @@ class Town(
             territory.town = town
             if (leader != null) {
                 leader.town = town
+                clearPendingMembershipRequests(leader)
                 leader.needsUpdate()
             }
             Nodes.towns[name] = town
@@ -147,6 +148,15 @@ class Town(
             territoryIds.forEach { id ->
                 val territory = Territory.fromId(TerritoryId(id))
                 if (territory != null) {
+                    territory.town?.takeIf { it !== town }?.let { previousOwner ->
+                        System.err.println(
+                            "Territory ${territory.id} is claimed by both ${previousOwner.name} and ${town.name}; keeping ${town.name}",
+                        )
+                        previousOwner.territories.remove(territory.id)
+                        previousOwner.annexed.remove(territory.id)
+                        previousOwner.needsUpdate()
+                        Nodes.needsSave = true
+                    }
                     town.territories.add(territory.id)
                     territory.town = town
                 }
@@ -185,6 +195,7 @@ class Town(
 
         fun destroy(town: Town) {
             val nation = town.nation
+            val indexedPlayers = town.playersOnline.associateBy { it.uuid }
             if (nation != null) {
                 if (nation.towns.size == 1) Nation.destroy(nation) else Nation.removeTown(nation, town)
             }
@@ -213,7 +224,10 @@ class Town(
                 resident.town = null
                 resident.nation = null
                 resident.needsUpdate()
-                resident.player()?.let { player -> nation?.playersOnline?.remove(player) }
+                (resident.player() ?: indexedPlayers[resident.uuid])?.let { player ->
+                    WaypointMenu.closeBrowse(player, resident)
+                    nation?.playersOnline?.remove(player)
+                }
             }
 
             // Cancel pending join applications' auto-expiry tasks so they don't fire later
@@ -328,22 +342,23 @@ class Town(
             return true
         }
 
-        // Was previously unguarded: none of the call sites checked resident.town first (the
-        // admin /nodesadmin town addplayer command still doesn't, and a player who applied to
-        // two towns could get accepted by both), so a resident could end up added to a second
-        // town's residents set while still also listed in their first town's -- resident.town
-        // only points at one of them, leaving the other with a dangling reference to a member
-        // who's no longer really theirs. Returns false instead of silently corrupting state so
-        // callers can tell the requester it didn't happen.
-        fun addResident(
-            town: Town,
-            resident: Resident,
-        ): Boolean {
-            if (resident.town != null) return false
+        private fun clearPendingMembershipRequests(resident: Resident) {
+            Nodes.towns.values.forEach { town ->
+                town.applications.remove(resident)?.cancel()
+            }
+            resident.inviteThread?.cancel()
+            resident.invitingTown = null
+            resident.invitingPlayer = null
+            resident.inviteThread = null
+        }
+
+        fun addResident(town: Town, resident: Resident): Boolean {
+            if (resident.town != null || Nodes.towns.values.any { it.residents.contains(resident) }) return false
 
             town.residents.add(resident)
             resident.town = town
             resident.trusted = false
+            clearPendingMembershipRequests(resident)
             resident.player()?.let { town.playersOnline.add(it) }
             town.nation?.let { nation ->
                 resident.nation = nation
@@ -367,7 +382,7 @@ class Town(
                 enumValues<TownPermissions>().forEach { permission -> plot.setPlayerPermission(resident.uuid, permission, null) }
             }
             resident.town = null
-            val player = resident.player()
+            val player = resident.player() ?: town.playersOnline.firstOrNull { it.uuid == resident.uuid }
             town.nation?.let { nation ->
                 resident.nation = null
                 nation.residents.remove(resident)
@@ -377,6 +392,7 @@ class Town(
             town.needsUpdate()
             resident.needsUpdate()
             resident.minimap?.refresh()
+            if (player != null) WaypointMenu.closeBrowse(player, resident)
             Nodes.needsSave = true
         }
 

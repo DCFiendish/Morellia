@@ -1,5 +1,6 @@
 package net.aechronis.nodes.objects
 
+import com.google.gson.JsonPrimitive
 import net.aechronis.nodes.Message
 import net.aechronis.nodes.Nodes
 import net.aechronis.nodes.utils.ChatColor
@@ -8,8 +9,8 @@ import net.minestom.server.item.Material
 
 // tier -> max warp distance in blocks
 val PORT_TIER_WARP_DIST: Map<Int, Int> = mapOf(
-    1 to 1000,
-    2 to 3000,
+    1 to 2500,
+    2 to 5000,
     3 to 10000,
 )
 
@@ -68,8 +69,8 @@ class Port(
         val isPublic = p.isPublic
 
         override fun createJsonString(): String = "{" +
-            "\"type\":\"$type\"," +
-            "\"name\":\"$name\"," +
+            "\"type\":${JsonPrimitive(type)}," +
+            "\"name\":${JsonPrimitive(name)}," +
             "\"chunkX\":$chunkX," +
             "\"chunkZ\":$chunkZ," +
             "\"tier\":$tier," +
