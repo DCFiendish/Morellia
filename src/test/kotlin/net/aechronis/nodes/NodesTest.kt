@@ -2,11 +2,13 @@ package net.aechronis.nodes
 
 import net.aechronis.nodes.constants.PermissionsGroup
 import net.aechronis.nodes.constants.TownPermissions
+import net.aechronis.nodes.objects.MinimapViewerSnapshot
 import net.aechronis.nodes.objects.Plot
 import net.aechronis.nodes.objects.Resident
 import net.aechronis.nodes.objects.Territory
 import net.aechronis.nodes.objects.TerritoryId
 import net.aechronis.nodes.objects.Town
+import net.aechronis.nodes.objects.WaypointSharing
 import net.aechronis.nodes.war.FlagWar
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
@@ -209,6 +211,46 @@ class NodesTest {
     fun `can enable war`() {
         FlagWar.enable(canAnnexTerritories = true, canOnlyAttackBorders = false, destructionEnabled = true)
         assertTrue(Nodes.war.enabled, "War should be enabled")
+    }
+
+    @Test
+    fun `town-shared waypoint is visible to town members but not outsiders`() {
+        val territory = Nodes.territories.values.first { it.town == null }
+        val leader = Resident(UUID.randomUUID(), "waypoint-leader")
+        Nodes.residents[leader.uuid] = leader
+        val town = Town.create("Waypointville", territory, leader).getOrThrow()
+
+        val member = Resident(UUID.randomUUID(), "waypoint-member")
+        Nodes.residents[member.uuid] = member
+        assertTrue(Town.addResident(town, member), "Member should join the town")
+
+        val outsider = Resident(UUID.randomUUID(), "waypoint-outsider")
+        Nodes.residents[outsider.uuid] = outsider
+
+        val waypoint = leader.createPermanentWaypoint("Docks", 100, 64, 200, WaypointSharing.TOWN).getOrThrow()
+
+        assertTrue(
+            member.availablePermanentWaypoints().any { visible -> visible.waypoint == waypoint },
+            "Town member should see the shared waypoint",
+        )
+        assertTrue(
+            outsider.availablePermanentWaypoints().none { visible -> visible.waypoint == waypoint },
+            "Non-member should not see the town-shared waypoint",
+        )
+    }
+
+    @Test
+    fun `suppressing native waypoint display empties the minimap snapshot`() {
+        val resident = Resident(UUID.randomUUID(), "suppress-tester")
+        Nodes.residents[resident.uuid] = resident
+        resident.createPermanentWaypoint("Home", 10, 70, 20, WaypointSharing.PRIVATE).getOrThrow()
+
+        val shown = MinimapViewerSnapshot.capture(resident)
+        assertTrue(shown.permanentWaypoints.isNotEmpty(), "Waypoint should render natively by default")
+
+        resident.suppressNativeWaypointDisplays = true
+        val suppressed = MinimapViewerSnapshot.capture(resident)
+        assertTrue(suppressed.permanentWaypoints.isEmpty(), "Native minimap markers should be suppressed once opted out")
     }
 
     @AfterAll
