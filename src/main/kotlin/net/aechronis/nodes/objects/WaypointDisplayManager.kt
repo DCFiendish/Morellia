@@ -59,12 +59,14 @@ internal class WaypointDisplayManager(
         if (!player.isOnline) return
 
         val desired = buildMap {
-            resident.visiblePermanentWaypoints().forEach { visible ->
-                val waypoint = visible.waypoint
-                put(
-                    WaypointDisplayKey(visible.owner.uuid, waypoint.key, false),
-                    WaypointDisplay(0, waypoint, false),
-                )
+            if (!resident.suppressNativeWaypointDisplays) {
+                resident.visiblePermanentWaypoints().forEach { visible ->
+                    val waypoint = visible.waypoint
+                    put(
+                        WaypointDisplayKey(visible.owner.uuid, waypoint.key, false),
+                        WaypointDisplay(0, waypoint, false),
+                    )
+                }
             }
             resident.deathWaypoint?.let { waypoint ->
                 put(

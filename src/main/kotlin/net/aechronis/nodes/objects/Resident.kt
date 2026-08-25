@@ -227,6 +227,13 @@ class Resident(val uuid: UUID, val name: String) {
     val permanentWaypoints: List<Waypoint> get() = permanentWaypointsByName.values.toList()
     private val waypointVisibility = linkedMapOf<String, Boolean>()
 
+    // True once this resident's client is known to render waypoints itself (e.g. a
+    // companion mod mirroring them as native map-marker waypoints), so the server's own
+    // in-world labels and minimap icons for permanent waypoints should stay off rather
+    // than stack on top of the client's markers. Session-only, not persisted — resets to
+    // false on next join.
+    var suppressNativeWaypointDisplays: Boolean = false
+
     internal fun availablePermanentWaypoints(): List<VisibleWaypoint> = buildList {
         permanentWaypointsByName.values.forEach { waypoint -> add(VisibleWaypoint(waypoint, this@Resident)) }
         Nodes.residents.values.asSequence()

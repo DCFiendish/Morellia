@@ -41,7 +41,11 @@ internal data class MinimapViewerSnapshot(
                 residentNation?.allies?.toSet().orEmpty(),
                 residentNation?.enemies?.toSet().orEmpty(),
                 FlagWar.enabled,
-                resident.visiblePermanentWaypoints().map(VisibleWaypoint::waypoint),
+                if (resident.suppressNativeWaypointDisplays) {
+                    emptyList()
+                } else {
+                    resident.visiblePermanentWaypoints().map(VisibleWaypoint::waypoint)
+                },
                 resident.deathWaypoint,
             )
         }
