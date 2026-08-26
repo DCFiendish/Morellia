@@ -24,15 +24,23 @@ repositories {
             password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
         }
     }
+    // nodes' first dependency on vanilla (previously independent sibling libraries) -- see
+    // NodesBlockPlacementCooldownListener.
+    maven {
+        url = uri("https://maven.pkg.github.com/DCFiendish/vanilla")
+        credentials {
+            username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
 }
 
 dependencies {
     implementation("net.minestom:minestom:2026.07.12-26.2")
     implementation("net.aechronis:utils:86a747b")
-    // Real (non-cosmetic) block-placement cooldown enforcement now lives in vanilla's
-    // BlockPlacementCooldownListener -- see NodesBlockPlacementCooldownListener. Needs a vanilla
-    // version published with that class before this actually resolves; bump the pin once it is.
-    implementation("net.aechronis:vanilla:a074e09")
+    // Real (non-cosmetic) block-placement cooldown enforcement lives in vanilla's
+    // BlockPlacementCooldownListener -- see NodesBlockPlacementCooldownListener.
+    implementation("net.aechronis:vanilla:96b593f")
 
     // testing
     testImplementation("org.jetbrains.kotlin:kotlin-test")
