@@ -17,7 +17,7 @@ import kotlin.math.hypot
  * Baseline movement anti-cheat: speed-hack (excess horizontal distance in one move update)
  * and fly-hack (sustained vertical ascent without touching ground) detection. Deliberately
  * simple per-move-event distance caps rather than tick-precise physics -- a cheap, high-
- * signal baseline per research-todo/03-anti-cheat-and-security.md, not a full NCP-style
+ * signal baseline per docs/research-todo/03-anti-cheat-and-security.md, not a full NCP-style
  * system. Enforcement is always a snap-back (cancel the offending move), never a kick/ban,
  * to keep false-positive risk low.
  *

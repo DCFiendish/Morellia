@@ -10,21 +10,19 @@ import net.minestom.server.Auth
 import net.minestom.server.coordinate.Pos
 
 fun main() {
-    // Real terrain: the trimmed Agadir Crisis map (Britain -> Morocco) loads from
-    // morellia-data/world via AnvilLoader. StoneFlatTerrain.generator is still passed here, but
-    // now purely as the out-of-bounds fallback for chunks the loader has no data for (anything
-    // outside the trimmed box), not as the primary ground everywhere -- see AgadirWorld.kt.
+    // Plain stone superflat everywhere (StoneFlatTerrain.generator, surface at y=64). Every
+    // real-world terrain source this project tried (AgadirWorld's AnvilLoader over a trimmed
+    // Anvil download, EuropeTerrain's procedural NOAA/WWF-heightmap generator) has been dropped --
+    // see docs/HANDOFF.md. Flat stone is the deliberate baseline while terrain gets replanned, not a
+    // fallback for a broken loader.
     val instance = createTestServer(
         generator = StoneFlatTerrain.generator,
-        // Placeholder spawn: confirmed on solid ground (central France) in the trimmed Agadir
-        // Crisis world -- the old coordinate here was tuned for the flat-stone-only test setup
-        // and landed in open water once real terrain replaced it. Real spawn placement is a
-        // separate design decision, not made yet.
-        spawnPoint = Pos(-3000.5, 70.0, -1500.5),
+        // Sits north of both LoadTestBots test towns' territories (chunks x:0-5, z:0-2), on the
+        // flat stone surface (y=64 top, so y=65 stands directly on it).
+        spawnPoint = Pos(48.5, 65.0, -20.5),
         auth = Auth.Offline(),
         port = 25567,
     )
-    AgadirWorld.attach(instance)
     instance.setChunkSupplier(::FullbrightChunk)
     Vanilla.init(VanillaConfig(path = "morellia-data/vanilla"))
     // Testing-only: cut capture time way down so siege tests don't take forever. Both test

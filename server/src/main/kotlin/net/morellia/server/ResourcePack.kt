@@ -8,8 +8,10 @@ import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
 import java.net.URI
 import java.util.UUID
 
-// Served as a plain static file off the panel's existing nginx — no separate hosting set up yet.
-private val PACK_URL = URI.create("http://0.0.0.0/resourcepack.zip")
+// Local-only for now (no deploys to the production VM during the replan -- see docs/HANDOFF.md).
+// Serve resourcepack.zip yourself before starting the server, e.g. from server/:
+//   python -m http.server 8000
+private val PACK_URL = URI.create("http://localhost:8000/resourcepack.zip")
 private val PACK_ID = UUID.fromString("6d6f7265-6c6c-6961-706b-000000000001")
 
 object ResourcePack {

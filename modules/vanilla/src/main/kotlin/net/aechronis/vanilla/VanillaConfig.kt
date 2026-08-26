@@ -100,7 +100,7 @@ data class VanillaConfig(
     val fireDmg: Float = 1f,
     val drowningDmg: Float = 2f,
     // Movement anti-cheat (baseline speed/fly-hack detection -- see
-    // research-todo/03-anti-cheat-and-security.md). Deliberately generous per-move-event
+    // docs/research-todo/03-anti-cheat-and-security.md). Deliberately generous per-move-event
     // distance caps, not tick-precise physics, to keep false-positive risk low.
     val maxHorizontalDistancePerMove: Double = 1.5,
     val maxHorizontalDistancePerMoveSprintOrSpeed: Double = 2.2,
