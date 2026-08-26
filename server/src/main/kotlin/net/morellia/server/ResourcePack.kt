@@ -15,12 +15,26 @@ private val PACK_URL = URI.create("http://localhost:8000/resourcepack.zip")
 private val PACK_ID = UUID.fromString("6d6f7265-6c6c-6961-706b-000000000001")
 
 object ResourcePack {
+    /**
+     * `computeHashAndBuild().join()` fetches [PACK_URL] synchronously at boot to hash it -- if
+     * nothing is serving it (no `resourcepack.zip` built yet, no local http.server running), this
+     * threw uncaught straight out of `main()` and silently skipped every call after `ResourcePack.init()`
+     * (`TickMonitor.init()`, `LoadTestBots.init()`, `Nodes.enableWar()`) even though the Minestom
+     * tick loop itself kept running -- found while boot-checking modules/combat, previously flagged
+     * as an open bug. Now just logs and skips the pack request instead of taking the rest of main()
+     * down with it.
+     */
     fun init() {
-        val info = ResourcePackInfo.resourcePackInfo()
-            .id(PACK_ID)
-            .uri(PACK_URL)
-            .computeHashAndBuild()
-            .join()
+        val info = try {
+            ResourcePackInfo.resourcePackInfo()
+                .id(PACK_ID)
+                .uri(PACK_URL)
+                .computeHashAndBuild()
+                .join()
+        } catch (e: Exception) {
+            System.err.println("[ResourcePack] Couldn't reach $PACK_URL -- skipping resource pack request (${e.message})")
+            return
+        }
 
         val request = ResourcePackRequest.resourcePackRequest()
             .packs(info)
