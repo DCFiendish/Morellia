@@ -1,4 +1,4 @@
-# Handoff — Morellia project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration 2026-08-26)
+# Handoff — Morellia project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration + combat built 2026-08-26)
 
 Deep background (library internals, design rationale) is in `RESEARCH.md`, `NODES_DEEP_DIVE.md`,
 `VANILLA_DEEP_DIVE.md`, `COMBAT_DEEP_DIVE.md`, and `research-todo/*.md` — not repeated here. This
@@ -159,8 +159,94 @@ both by `Aechronis/combat` being AGPL-3.0 licensed (same as `vanilla`/`utils`, w
 already depends on, but not something to extend further by choice) and by the chance to design
 around the known CRITICAL/HIGH bugs from the start rather than inheriting and re-fixing them.
 Scope agreed so far: start with just guns and melee (era-appropriate for Agadir Crisis
-bolt-actions/machine guns), not the full vehicle/drone/plane/tank/boat suite. **Nothing has been
-built yet** — this is the actual next step once the monorepo migration above is committed.
+bolt-actions/machine guns), not the full vehicle/drone/plane/tank/boat suite.
+
+## Status update (2026-08-26): `modules/combat` built, guns/melee working end-to-end (no real assets yet)
+
+Full plan lives at `.claude/plans/lets-plan-out-guns-merry-twilight.md` (guns, melee, vehicles,
+resource pack pipeline). **Steps 1-4 of that plan are done and boot-tested; steps 5-8 (vehicles,
+asset pipeline) are not started.** None of this is committed to git yet — it's sitting in the
+working tree (`modules/combat/`, plus edits to `FlagWar.kt`, `TestWeapons.kt`, `Main.kt`,
+`ResourcePack.kt`, and new `DevLoadout.kt`/`TestMeleeTarget.kt` in `server/`).
+
+- **`modules/combat` is a from-scratch module**, package `net.morellia.combat` (own namespace, not
+  AGPL-bound the way the forked `nodes`/`vanilla`/`utils` are) — `net.aechronis:combat` is now fully
+  dropped, including its GitHub Packages repo block in the root `build.gradle.kts`.
+- **Every named CRITICAL/HIGH bug from `COMBAT_DEEP_DIVE.md` that's in scope so far was designed out
+  from the start**, not retrofitted: C2 (reload ammo-theft dupe — reload task captures+re-checks the
+  stack's UUID tag every tick), C3 (raycast wall-passthrough — `Ray.firstBlock` fails *closed* on an
+  unloaded chunk or unrecognized collision shape), C4 (no melee reach check — `MeleeListener` enforces
+  `Melee.maxReach` server-side), H1 (thread safety — every per-player state map in `Combat.kt` is
+  `ConcurrentHashMap` from the first line), H5 (cooldown-reset swap bypass — `PlayerSwapItemEvent`
+  cancelled outright while holding any combat item).
+- **Real deviation from the written plan** (the plan named `PlayerStartSneakingEvent`/dig-based
+  firing — neither exists/works as assumed on this Minestom version, confirmed against the actual
+  pinned jar): ADS uses `PlayerInputEvent.hasPressedShiftKey()`/`hasReleasedShiftKey()`; firing uses
+  `PlayerHandAnimationEvent` (universal on every left-click, unlike dig events which need a targeted
+  block within short range — a dealbreaker for a 128-block hitscan gun) with a timeout heuristic for
+  the automatic/semi-auto distinction (`FireListener.kt`'s kdoc has the full reasoning).
+- **Test content** (`TestWeapons.kt`, base `Material` rendering only — no real item models/textures
+  yet): musket + musket ball (unrestricted), bayonet, and a zone-restricted field gun (only fires in
+  wilderness or an actively-sieged chunk, via a `Gun.usableZones` predicate built from real
+  `Territory`/`TerritoryChunk` data — required one new public accessor on `nodes`,
+  `FlagWar.isEnabled`, previously `internal`).
+- **Found and fixed a real pre-existing bug while boot-testing**: `ResourcePack.kt`'s
+  `computeHashAndBuild().join()` threw uncaught when nothing served `localhost:8000/resourcepack.zip`
+  (no pack has been built yet), which silently skipped everything after it in `main()` —
+  `TickMonitor.init()`, `LoadTestBots.init()` (so the two test towns/nations never got created),
+  `Nodes.enableWar()` — even though the Minestom tick loop itself kept running, so this was invisible
+  unless you specifically checked for the towns/war state. Now just logs and continues.
+- **New dev-only scaffolding for solo testing** (same category as `LoadTestBots.kt` — remove once
+  real players take over): `DevLoadout.kt` gives every real (non-bot) player a full musket/bayonet/
+  field-gun loadout on every spawn/respawn; `TestMeleeTarget.kt` spawns a stationary 500-HP zombie
+  near spawn (no AI attached, so it just stands still) that respawns itself 3s after dying.
+- **Live-tested for real, not just compiled**: a separate bare Fabric dev-client project (outside
+  this repo — see the `morellia-testclient` reference memory for exact setup/gotchas) connected to
+  the local server and loaded into the world with the loadout/dummy present. Fire/reload/melee/ADS
+  themselves haven't been played through by a human yet — that's the actual next verification step,
+  not asset work.
+- **Genuinely next**: sourcing/building real assets (model + texture + sound) for the musket
+  specifically first, per `research-todo/10-asset-sourcing-and-licensing.md`'s policy/format and
+  sourcing order — that's asset-creation work, not code, and hasn't started. Vehicles (plan steps
+  5-8) come after.
+
+## Status update (2026-08-26): musket has a real model, resource pack pipeline stood up end-to-end
+
+- **`resourcepack/` now exists** (repo root, not yet a `.gitignore`'d build output — it's the
+  source tree, distinct from the *built* `server/resourcepack.zip`). Musket's model/texture are
+  real: the Mosin Nagant from `memava`'s MIT-licensed "WWI & WWII rifles" pack
+  (https://modrinth.com/resourcepack/rifles), extracted out of its original crossbow-rename-predicate
+  wrapper. Source/license recorded in `resourcepack/CREDITS.md` — keep adding an entry there per
+  asset per the sourcing doc's own policy.
+- **Corrected a wrong assumption in `research-todo/10-asset-sourcing-and-licensing.md`** (that
+  doc's "target format" section implied `item_model` points straight at a raw model). Confirmed
+  against the actual Minecraft wiki: **`item_model`'s string value is an item-definition id**
+  (`assets/<namespace>/items/<id>.json`, the `{"model": {"type": "model", "model": "<raw model
+  path>"}}` wrapper format), not a raw-model path directly. Got this wrong on the first pass here
+  too — wired `Gun.itemModel` straight at the raw model path, item rendered as Minecraft's generic
+  purple/black missing-model placeholder, fixed by adding the `items/<id>.json` wrapper and
+  pointing `itemModel` at its id instead. Apply this to every future `itemModel`/`itemModelEmpty`/
+  `itemModelReloading`/`itemModelAiming` value — each needs its own `items/<id>.json` wrapper.
+- **Build step**: `resourcepack/` (containing `pack.mcmeta` + `assets/`) gets jarred into
+  `server/resourcepack.zip` via `jar cf` — not PowerShell's `Compress-Archive`, which writes
+  backslash path separators into zip entries that Minecraft's loader can't read. `pack.mcmeta` uses
+  `{"pack": {"min_format": 69, "max_format": 99, ...}}`, matching what the source pack itself
+  shipped for 26.2 compatibility.
+- **Serving it locally**: JDK 25 ships `jwebserver` (`jwebserver -p 8000 -b 127.0.0.1`, run from
+  `server/`) — no Python needed. This process (like the Morellia server itself) has died
+  unexpectedly mid-session more than once with no visible cause; if `ResourcePack.kt` logs
+  "Couldn't reach http://localhost:8000/resourcepack.zip", check `jwebserver` is still alive before
+  assuming anything else is wrong.
+- **A stale `./gradlew.bat run` process silently held port 25567 across a `[killed]` log line at
+  least once** — the log entry doesn't necessarily mean the OS process actually exited. If a fresh
+  `run` fails with `BindException: Address already in use`, find and kill the real PID
+  (`netstat -ano | findstr :25567`) before retrying, don't assume the port is free just because the
+  backgrounded task reported as stopped.
+- **Still open, exactly where the user left off**: sounds (no `.ogg`s exist anywhere yet, this pack
+  had none), a visual reload indicator beyond the existing durability-bar ammo counter (already
+  works via `Gun.setAmmo`), and ADS visual feedback (currently server-side spread/recoil only — no
+  zoom/crosshair/held-pose change). None of these are scoped yet — first thing to nail down in
+  whatever session picks this up next.
 
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
@@ -305,16 +391,15 @@ tile pyramid — not built, flagged as a future nice-to-have, not requested).
 - **New, 2026-08-25/26, actually next up**: Morellia's own `server/build.gradle.kts` pins are stale
   against what's now on `nodes`/`vanilla` master (`40b2270`/`a074e09` vs. the current `6f1f9dd`/
   `96b593f`) — see the nodes/vanilla status update above for the exact bump + follow-up work.
-- **`combat`'s CRITICAL/HIGH bugs are still live** (async unsynchronized explosion terrain mutation,
-  reload ammo-theft dupe, raycast wall-passthrough, no melee reach check, explosion ignoring
-  line-of-sight — see `COMBAT_DEEP_DIVE.md`). Unlike `nodes`/`vanilla` (both forked, and both had
-  essentially every CRITICAL/HIGH finding from their deep-dives fixed by 2026-08-05 — see each fork's
-  README), `combat` is consumed directly from upstream `Aechronis/combat`, unforked, per project
-  convention — upstream's recent commits are vehicle-mechanics fixes, not these. This is the single
-  biggest concrete correctness gap left before real PvP/vehicle playtesting; needs either forking
-  `combat` too (a policy change) or these fixed upstream. See
-  `research-todo/01-concurrency-model.md` (resolved 2026-08-06) for the thread-safety model these
-  bugs were triaged against.
+- **Superseded 2026-08-26**: `net.aechronis:combat` is no longer a dependency at all — replaced by
+  the from-scratch `modules/combat` (see that status update above), which designs out the bug
+  classes this bullet used to track (C2/C3/C4/H1/H5 confirmed fixed; C1/C5 and the remaining H-tier
+  findings are moot since they were vehicle/explosion-specific and vehicles aren't built yet). See
+  `research-todo/01-concurrency-model.md` (resolved 2026-08-06) for the thread-safety model
+  `modules/combat`'s `ConcurrentHashMap`-everywhere design was built against.
+- **Not yet committed**: all of `modules/combat` plus the `server/` changes that wire it in are
+  sitting uncommitted in the working tree as of 2026-08-26 — commit them once fire/reload/melee/ADS
+  have actually been played through by a human (see the status update above).
 - Alliance/enemy relationships between the 10 nations (currently all neutral) — moot until the
   terrain/border replan lands real nation territory again.
 - **New, 2026-08-25**: real terrain needs replanning from scratch (both prior attempts abandoned —
