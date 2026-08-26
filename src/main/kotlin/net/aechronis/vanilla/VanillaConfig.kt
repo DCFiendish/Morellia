@@ -32,6 +32,7 @@ data class VanillaConfig(
     val spawnEnabled: Boolean = true,
     val kothEnabled: Boolean = true,
     val movementAntiCheatEnabled: Boolean = true,
+    val blockPlacementCooldownEnabled: Boolean = true,
     // Paths
     val path: String = "vanilla",
     val playerDataPath: String = "playerdata",
