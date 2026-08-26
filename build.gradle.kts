@@ -29,6 +29,10 @@ repositories {
 dependencies {
     implementation("net.minestom:minestom:2026.07.12-26.2")
     implementation("net.aechronis:utils:86a747b")
+    // Real (non-cosmetic) block-placement cooldown enforcement now lives in vanilla's
+    // BlockPlacementCooldownListener -- see NodesBlockPlacementCooldownListener. Needs a vanilla
+    // version published with that class before this actually resolves; bump the pin once it is.
+    implementation("net.aechronis:vanilla:a074e09")
 
     // testing
     testImplementation("org.jetbrains.kotlin:kotlin-test")

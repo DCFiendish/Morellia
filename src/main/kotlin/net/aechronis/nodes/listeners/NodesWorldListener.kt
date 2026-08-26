@@ -166,6 +166,8 @@ object NodesWorldListener {
         val blockPos = event.blockPosition
         val player: Player = event.player
 
+        NodesBlockPlacementCooldownListener.apply(player, blockPos.blockX, blockPos.blockZ)
+
         // war specific tasks
         if (FlagWar.enabled) {
             val territoryChunk = TerritoryChunk.fromBlock(blockPos.blockX, blockPos.blockZ)

@@ -2,7 +2,9 @@ package net.aechronis.nodes
 
 import net.aechronis.nodes.constants.PermissionsGroup
 import net.aechronis.nodes.constants.TownPermissions
+import net.aechronis.nodes.listeners.NodesBlockPlacementCooldownListener
 import net.aechronis.nodes.objects.MinimapViewerSnapshot
+import net.aechronis.nodes.objects.Nation
 import net.aechronis.nodes.objects.OreDeposit
 import net.aechronis.nodes.objects.OreSampler
 import net.aechronis.nodes.objects.Plot
@@ -12,21 +14,31 @@ import net.aechronis.nodes.objects.TerritoryId
 import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.objects.WaypointSharing
 import net.aechronis.nodes.war.FlagWar
+import net.aechronis.vanilla.listeners.BlockPlacementCooldownListener
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
 import net.minestom.server.MinecraftServer
+import net.minestom.server.coordinate.BlockVec
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.GameMode
+import net.minestom.server.entity.Player
 import net.minestom.server.event.EventNode
 import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
 import net.minestom.server.event.player.PlayerBlockInteractEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.event.server.ServerTickMonitorEvent
+import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
+import net.minestom.server.network.packet.server.SendablePacket
+import net.minestom.server.network.packet.server.play.SetCooldownPacket
+import net.minestom.server.network.player.GameProfile
+import net.minestom.server.network.player.PlayerConnection
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import java.net.InetSocketAddress
+import java.net.SocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -119,6 +131,11 @@ class NodesTest {
 
         // initialize nodes with test config
         Nodes.initialize(config)
+
+        // Only the one vanilla listener this test actually exercises -- not a full Vanilla.init(),
+        // which would also spin up playerdata/storage/whitelist file I/O rooted at a relative
+        // "vanilla" path this test suite has no business touching.
+        BlockPlacementCooldownListener.init()
     }
 
     @Test
@@ -463,6 +480,68 @@ class NodesTest {
         resident.suppressNativeWaypointDisplays = true
         val suppressed = MinimapViewerSnapshot.capture(resident)
         assertTrue(suppressed.permanentWaypoints.isEmpty(), "Native minimap markers should be suppressed once opted out")
+    }
+
+    private class CapturingConnection : PlayerConnection() {
+        val packets = mutableListOf<SendablePacket>()
+
+        override fun sendPacket(packet: SendablePacket) {
+            packets.add(packet)
+        }
+
+        override fun getRemoteAddress(): SocketAddress = InetSocketAddress(0)
+    }
+
+    @Test
+    fun `foreign claim placement cools block materials but exempts friendly claims`() {
+        val territories = Nodes.territories.values.filter { it.town == null }.take(4)
+        assertEquals(4, territories.size)
+        val suffix = UUID.randomUUID().toString().take(8)
+        val target = Town.create("CooldownTarget$suffix", territories[0], null).getOrThrow()
+        val nationTown = Town.create("CooldownNation$suffix", territories[1], null).getOrThrow()
+        val allyTown = Town.create("CooldownAlly$suffix", territories[2], null).getOrThrow()
+        val targetNation = Nation.create("CooldownTargetNation$suffix", target).getOrThrow()
+        Nation.addTown(targetNation, nationTown).getOrThrow()
+        val allyNation = Nation.create("CooldownAllyNation$suffix", allyTown).getOrThrow()
+        Nation.addAlly(targetNation, allyNation).getOrThrow()
+
+        val connection = CapturingConnection()
+        val player = Player(connection, GameProfile(UUID.randomUUID(), "cooldown-test"))
+        val resident = Resident(player.uuid, player.username)
+        val position = BlockVec(territories[0].core.x * 16, 64, territories[0].core.z * 16)
+        Nodes.residents[resident.uuid] = resident
+        player.inventory.setItemStack(0, ItemStack.of(Material.DIRT))
+        player.inventory.setItemStack(1, ItemStack.of(Material.STONE))
+        player.inventory.setItemStack(2, ItemStack.of(Material.DIRT))
+        player.inventory.setItemStack(3, ItemStack.of(Material.DIAMOND))
+
+        try {
+            NodesBlockPlacementCooldownListener.apply(player, position.blockX, position.blockZ)
+            val cooldowns = connection.packets.filterIsInstance<SetCooldownPacket>()
+            assertEquals(setOf(Material.DIRT.key().asString(), Material.STONE.key().asString()), cooldowns.map { it.cooldownGroup() }.toSet())
+            assertTrue(cooldowns.all { it.cooldownTicks() == 4 })
+
+            fun assertNoCooldown(town: Town?, blockPosition: BlockVec = position) {
+                connection.packets.clear()
+                resident.town = town
+                NodesBlockPlacementCooldownListener.apply(player, blockPosition.blockX, blockPosition.blockZ)
+                assertTrue(connection.packets.filterIsInstance<SetCooldownPacket>().isEmpty())
+            }
+
+            assertNoCooldown(target)
+            assertNoCooldown(nationTown)
+            assertNoCooldown(allyTown)
+            assertNoCooldown(null, BlockVec(territories[3].core.x * 16, 64, territories[3].core.z * 16))
+        } finally {
+            resident.town = null
+            Nodes.residents.remove(resident.uuid)
+            Nation.destroy(targetNation)
+            Nation.destroy(allyNation)
+            Town.destroy(target)
+            Town.destroy(nationTown)
+            Town.destroy(allyTown)
+            player.remove()
+        }
     }
 
     @AfterAll
