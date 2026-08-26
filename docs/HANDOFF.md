@@ -29,7 +29,7 @@ Current state:
   `Material`).
 - **`ResourcePack.kt` no longer points at the production VM** — moved to a localhost URL; the
   resource pack itself will be rebuilt once sourced assets exist.
-- **Guardrail for this phase: no deploys to the Oracle VM (0.0.0.0).** Everything is
+- **Guardrail for this phase: no deploys to the Oracle VM** (see `.claude/skills/morellia-ops/SKILL.md`, gitignored, for connection details). Everything is
   local-only until the replan is far enough along to redeploy. GitHub pushes are unaffected.
 - The 1911 Agadir Crisis **theme/design intent itself is not abandoned** — the theme section right
   below still describes the target setting. What's gone is the concrete real-world terrain and
@@ -87,7 +87,7 @@ monorepo migration below, which changes what "bump the pin" even means going for
    the local boot check re-run and confirmed clean (Minestom started, Vanilla modules loaded, the
    local 2-town test fixture loaded, income ticked). Moot now — the monorepo migration below
    replaced both pins with `project(...)` dependencies, so there's no SHA to track anymore.
-2. `C:\Users\USER\.gradle\gradle.properties` was empty (0 bytes) at the start of this session,
+2. The user's global `~/.gradle/gradle.properties` was empty (0 bytes) at the start of this session,
    blocking local resolution of anything not already cached (`net.aechronis:vanilla:96b593f` failed
    with "Username must not be null!"). The user populated `gpr.user`/`gpr.token` themselves (Claude
    does not enter credentials into files, even when given the value directly — see feedback memory).
@@ -313,7 +313,8 @@ Current pipeline (all scratchpad tooling, not committed):
    before.
 
 Deployed via the usual stop→swap→start sequence (see gotchas below); pre-deploy `.bak` copies exist
-both on the Pterodactyl volume and in `/opt/nodes-map/nodes/` as
+both on the Pterodactyl volume (see `.claude/skills/morellia-ops/SKILL.md`, gitignored) and in
+`/opt/nodes-map/nodes/` as
 `{world,towns}.json.pre-compact-real-borders.bak`, alongside the original
 `{world,towns}.json.pre-agadir-borders-backup` from the very first (flat-world) territory rollout.
 
@@ -329,9 +330,10 @@ ally/enemy/neutral between equal `Nation`s.
 
 ## nodes-map: live territory viewer (historical — describes the production VM only, untouched but not part of current local-only work; see status update above)
 
-`DCFiendish/nodes-map` (fork of `Aechronis/nodes-map`) is built and deployed to the production VM at
-`http://0.0.0.0:8888`, served via a systemd unit (`nodes-map.service`, `python3 -m http.server
-8888` from `/opt/nodes-map`). `js/app.js`'s `PAN_BOUNDS` was updated to the real trimmed-box extent.
+`DCFiendish/nodes-map` (fork of `Aechronis/nodes-map`) is built and deployed to the production VM
+(address in `.claude/skills/morellia-ops/SKILL.md`, gitignored) on port 8888, served via a systemd
+unit (`nodes-map.service`, `python3 -m http.server 8888` from `/opt/nodes-map`). `js/app.js`'s
+`PAN_BOUNDS` was updated to the real trimmed-box extent.
 Firewalled open at both the Oracle NSG layer and the VM's own iptables (`netfilter-persistent`
 persisted) — both layers required, opening one alone doesn't make the port reachable. It currently
 shows territory-color overlays only, no base terrain tile imagery (that would need a rendered webp
@@ -339,12 +341,12 @@ tile pyramid — not built, flagged as a future nice-to-have, not requested).
 
 ## Access / credentials (unchanged from before)
 
-- **SSH to the Oracle box**: `ssh -i C:\Users\USER\.ssh\id_ed25519 ubuntu@0.0.0.0`
-- **This is the user's own Oracle VM** ([HOSTING-BUSINESS-NAME] business), shared by multiple of the user's
-  own projects — `REDACTED-PROJECT-2`, `morellia` (this project), `REDACTED-PROJECT` — plus at least one other
-  tenant's service the user has hosted as a favor ("REDACTED-THIRDPARTY-SERVICE" on port 8090, not part of this
-  project, never modified — only ever viewed read-only to identify what was already running on the
-  shared box before picking nodes-map's own port). **Do not touch anything on this box beyond
+- **SSH to the Oracle box**: connection details (host, key path) are in
+  `.claude/skills/morellia-ops/SKILL.md` (gitignored, not in this public repo).
+- **This is the user's own Oracle VM** (personal hosting), shared by multiple of the user's own
+  other projects, plus at least one other tenant's service the user has hosted as a favor (not part
+  of this project, never modified — only ever viewed read-only to identify what was already running
+  on the shared box before picking nodes-map's own port). **Do not touch anything on this box beyond
   Morellia's own container/files without explicit confirmation** — it is genuinely multi-tenant.
 - **GitHub**: `gh` CLI already authenticated as `DCFiendish`. Repos:
   - `DCFiendish/nodes` — fork of `Aechronis/nodes`; as of 2026-08-26 its history lives in
@@ -355,24 +357,23 @@ tile pyramid — not built, flagged as a future nice-to-have, not requested).
   - `DCFiendish/nodes-map` — fork of `Aechronis/nodes-map`, new this session
   - `DCFiendish/rust-mc-bot` — fork of `Eoghanmc22/rust-mc-bot`
   - `Aechronis/utils`, `Aechronis/combat` — used directly, not forked, no local changes
-- **GitHub Packages token**: `C:\Users\USER\.gradle\gradle.properties` (`gpr.user`/`gpr.token`) —
-  was empty at the start of the 2026-08-25/26 session (blocked local resolution of anything not
-  already cached), populated by the user since. Only still needed for `net.aechronis:utils` and
-  `net.aechronis:combat` now that `nodes`/`vanilla` are in-tree `project(...)` dependencies (see
-  the 2026-08-26 monorepo migration status update).
-- **This repo (`C:\Users\USER\Aechronis`) is a real git repo now** (was flagged as a gap in the old
-  version of this doc — resolved, it's tracked and pushed).
+- **GitHub Packages token**: lives in the user's global `~/.gradle/gradle.properties` (`gpr.user`/
+  `gpr.token`), outside this repo — was empty at the start of the 2026-08-25/26 session (blocked
+  local resolution of anything not already cached), populated by the user since. Only still needed
+  for `net.aechronis:utils` and `net.aechronis:combat` now that `nodes`/`vanilla` are in-tree
+  `project(...)` dependencies (see the 2026-08-26 monorepo migration status update).
+- **This repo is a real git repo now** (was flagged as a gap in the old version of this doc —
+  resolved, it's tracked and pushed).
 
 ## Server identifiers
 
-- Pterodactyl server UUID: `00000000-0000-0000-0000-000000000000`
-- Volume path: `/var/lib/pterodactyl/volumes/00000000-0000-0000-0000-000000000000` → `/home/container`
-  in the container
+Pterodactyl server UUID, volume path, and container ownership details are in
+`.claude/skills/morellia-ops/SKILL.md` (gitignored, not in this public repo) — not repeated here.
+
 - Docker container ID changes across restarts — always re-fetch via `sudo docker ps`, never reuse
   one from a prior session; verify by volume UUID, not by assuming the first `docker ps` row is
   Morellia (this box runs multiple containers)
 - Port: 25567 (tcp + udp), offline-mode auth (`Auth.Offline()`)
-- `server.jar` inside the volume is owned by uid/gid `998:998`
 
 ## Gotchas worth remembering (also in `.claude/skills/morellia-ops/SKILL.md`)
 
