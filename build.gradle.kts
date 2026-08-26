@@ -22,14 +22,6 @@ allprojects {
                 password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
-        // Only :server still consumes this — drop once modules/combat replaces net.aechronis:combat.
-        maven {
-            url = uri("https://maven.pkg.github.com/Aechronis/combat")
-            credentials {
-                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
-                password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
-            }
-        }
     }
 }
 

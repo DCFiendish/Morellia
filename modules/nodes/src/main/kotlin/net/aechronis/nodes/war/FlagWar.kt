@@ -76,6 +76,11 @@ object FlagWar {
     // flag that war is turned on
     internal var enabled: Boolean = false
 
+    // Public read-only view of `enabled` -- combat/zone-restriction code outside this module (e.g.
+    // "this weapon is only usable while war is active") needs to read the global war flag, but
+    // `enabled` itself stays internal since only FlagWar's own logic should ever set it.
+    val isEnabled: Boolean get() = enabled
+
     // allow annexing territories during war (disable for border skirmishes)
     internal var canAnnexTerritories: Boolean = false
 

@@ -18,7 +18,7 @@ dependencies {
     implementation("net.aechronis:utils:86a747b")
     implementation(project(":modules:vanilla"))
     implementation(project(":modules:nodes"))
-    implementation("net.aechronis:combat:2c63782") // still external — bumped from 5a628df: frozen-scoped-player fix, car ground detection, vehicle hitbox/projectile collision, ammo-decrement, vehicle invis/invuln. Replace with modules:combat once that module exists.
+    implementation(project(":modules:combat"))
     implementation("org.slf4j:slf4j-simple:2.0.18")
     // Not running LuckPerms at all — this is here purely so utils' Permissions.kt can resolve
     // LuckPermsProvider at runtime (NoClassDefFoundError otherwise) and fall through to its
