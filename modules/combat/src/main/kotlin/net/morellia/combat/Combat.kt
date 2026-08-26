@@ -10,6 +10,7 @@ import net.morellia.combat.listeners.MeleeListener
 import net.morellia.combat.listeners.PlayerDisconnectListener
 import net.morellia.combat.listeners.ReloadListener
 import net.morellia.combat.listeners.WeaponSwapListener
+import net.morellia.combat.tasks.ActionBarManager
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -25,6 +26,8 @@ object Combat {
     internal val lastFireInputTimes = ConcurrentHashMap<Player, Long>()
     internal val autoFireTasks = ConcurrentHashMap<Player, Task>()
     internal val reloadTasks = ConcurrentHashMap<Player, Task>()
+    /** 0.0-1.0 fraction of the way through the in-progress reload, if any -- see ReloadListener/ActionBarManager. */
+    internal val reloadProgress = ConcurrentHashMap<Player, Double>()
     internal val aimingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
     internal val meleeLastAttackTimes = ConcurrentHashMap<Player, Long>()
 
@@ -37,6 +40,7 @@ object Combat {
         MeleeListener.init()
         WeaponSwapListener.init()
         PlayerDisconnectListener.init()
+        ActionBarManager.start()
     }
 
     /** Drops every per-player entry -- called on disconnect so state maps don't grow unbounded. */
@@ -45,6 +49,7 @@ object Combat {
         lastFireInputTimes.remove(player)
         autoFireTasks.remove(player)?.cancel()
         reloadTasks.remove(player)?.cancel()
+        reloadProgress.remove(player)
         aimingPlayers.remove(player)
         meleeLastAttackTimes.remove(player)
     }

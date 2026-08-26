@@ -3,6 +3,7 @@ package net.morellia.combat.objects
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.sound.Sound
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.minestom.server.component.DataComponents
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.LivingEntity
@@ -65,6 +66,35 @@ class Gun(
 
     fun hasAmmo(stack: ItemStack): Boolean = getAmmo(stack) > 0
 
+    /** HUD text for the loaded/max ammo count, e.g. "Musket [3/5]" -- see ActionBarManager. */
+    fun ammoText(stack: ItemStack): Component =
+        itemName
+            .append(Component.text(" [${getAmmo(stack)}/$magazineSize]", NamedTextColor.GRAY))
+
+    /**
+     * Re-applies whichever of [itemModelEmpty]/[itemModelReloading]/[itemModelAiming]/[itemModel]
+     * matches [player]'s current ammo/reload/aim state to their held stack, if it's still this Gun
+     * (a no-op otherwise -- guards against a listener firing after the player has already switched
+     * weapons). Written to the physical ItemStack's component, not sent as a one-off packet, so the
+     * variant persists correctly across hotbar switches for free. Called from every state
+     * transition that can change which variant applies: [fire] (ammo may hit 0), reload start/end
+     * (ReloadListener), and aim press/release (AimingListener).
+     */
+    fun refreshModel(player: Player) {
+        val stack = player.itemInMainHand
+        if (Item.getFromItemStack(stack) !== this) return
+        val model =
+            when {
+                Combat.reloadTasks.containsKey(player) -> itemModelReloading
+                !hasAmmo(stack) -> itemModelEmpty
+                player in Combat.aimingPlayers -> itemModelAiming
+                else -> itemModel
+            } ?: return
+        if (stack.get(DataComponents.ITEM_MODEL) != model) {
+            player.itemInMainHand = stack.with(DataComponents.ITEM_MODEL, model)
+        }
+    }
+
     /**
      * Returns [stack] with its ammo count set to [amount] (clamped to `0..magazineSize`), encoded
      * via the vanilla damage/durability-bar components so the client renders it without needing a
@@ -126,6 +156,7 @@ class Gun(
         instance.playSound(soundFire, origin.x, origin.y, origin.z)
         recoil(player, spreadMultiplier)
         player.itemInMainHand = setAmmo(stack, getAmmo(stack) - 1)
+        refreshModel(player)
         return true
     }
 

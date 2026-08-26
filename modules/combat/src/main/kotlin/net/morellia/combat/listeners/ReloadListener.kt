@@ -46,6 +46,7 @@ object ReloadListener {
                     val currentStack = player.itemInMainHand
                     if (Item.instanceId(currentStack) != startInstanceId) {
                         Combat.reloadTasks.remove(player)?.cancel()
+                        Combat.reloadProgress.remove(player)
                         return@buildTask
                     }
                     if (elapsedMs >= gun.reloadMs) {
@@ -53,34 +54,55 @@ object ReloadListener {
                             player.itemInMainHand = gun.setAmmo(player.itemInMainHand, gun.magazineSize)
                         }
                         Combat.reloadTasks.remove(player)?.cancel()
+                        Combat.reloadProgress.remove(player)
+                        gun.refreshModel(player)
+                    } else {
+                        Combat.reloadProgress[player] = elapsedMs.toDouble() / gun.reloadMs
                     }
                 }.delay(TaskSchedule.millis(RELOAD_TICK_MS))
                 .repeat(TaskSchedule.millis(RELOAD_TICK_MS))
                 .schedule()
 
         Combat.reloadTasks[player] = task
+        Combat.reloadProgress[player] = 0.0
+        gun.refreshModel(player)
         player.instance?.playSound(gun.soundReload, player.position.x, player.position.y, player.position.z)
     }
+
+    /**
+     * Reloads always go from empty to a full [Gun.magazineSize] (see [tryStartReload]'s ammo==0
+     * gate), so the reserve cost is one loose [Gun.ammo] item per round in the magazine, not a
+     * flat one-item "fully loaded clip" cost -- a magazineSize=1 musket and a magazineSize=5 rifle
+     * both spend real rounds 1:1, they just spend a different count of them per reload.
+     */
+    private fun totalReserveAmmo(
+        player: Player,
+        gun: Gun,
+    ): Int = player.inventory.itemStacks.filter { isReserveAmmoStack(it, gun) }.sumOf { it.amount() }
 
     private fun hasReserveAmmo(
         player: Player,
         gun: Gun,
-    ): Boolean = player.inventory.itemStacks.any { isReserveAmmoStack(it, gun) }
+    ): Boolean = totalReserveAmmo(player, gun) >= gun.magazineSize
 
-    /** Consumes one reserve Ammo stack (one stack = one full magazine refill). Returns whether one was found. */
+    /** Consumes [Gun.magazineSize] total reserve ammo, spanning multiple stacks if one isn't enough. */
     private fun consumeReserveAmmo(
         player: Player,
         gun: Gun,
     ): Boolean {
+        if (totalReserveAmmo(player, gun) < gun.magazineSize) return false
+
         val inventory = player.inventory
+        var remaining = gun.magazineSize
         for (slot in inventory.itemStacks.indices) {
+            if (remaining <= 0) break
             val stack = inventory.itemStacks[slot]
-            if (isReserveAmmoStack(stack, gun)) {
-                inventory.setItemStack(slot, stack.withAmount(stack.amount() - 1))
-                return true
-            }
+            if (!isReserveAmmoStack(stack, gun)) continue
+            val taken = minOf(remaining, stack.amount())
+            inventory.setItemStack(slot, stack.withAmount(stack.amount() - taken))
+            remaining -= taken
         }
-        return false
+        return true
     }
 
     private fun isReserveAmmoStack(

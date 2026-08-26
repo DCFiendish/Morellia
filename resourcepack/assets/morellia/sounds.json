@@ -1,0 +1,12 @@
+{
+  "musket.fire": {
+    "sounds": [
+      "morellia:guns/musket/fire"
+    ]
+  },
+  "musket.reload": {
+    "sounds": [
+      "morellia:guns/musket/reload"
+    ]
+  }
+}
