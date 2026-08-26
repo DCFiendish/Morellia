@@ -22,21 +22,8 @@ import net.minestom.server.timer.TaskSchedule
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
 import java.text.SimpleDateFormat
 import java.util.Date
-
-// Writes via a sibling temp file + atomic rename instead of truncating the real save file in
-// place. A direct in-place write (the previous behavior for both towns.json and buildings.json)
-// leaves a truncated, invalid-JSON file on disk if the process dies mid-write (OOM kill, power
-// loss, crash) -- on next boot, parsing that file fails and the world loads as if it were brand
-// new (zero towns/nations/residents). The temp file is always either fully written or not renamed
-// at all, so the real save file only ever gets replaced by a complete, valid write.
-private fun writeStringAtomically(path: Path, content: String) {
-    val tmpPath = path.resolveSibling("${path.fileName}.tmp")
-    Files.writeString(tmpPath, content)
-    Files.move(tmpPath, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-}
 
 /**
  * Runnable task to save world. This can be run either synchronously or
@@ -57,7 +44,7 @@ class TaskSaveWorld(
             nationsSnapshot,
         )
 
-        writeStringAtomically(Nodes.config.pathTowns, jsonStr)
+        AtomicFiles.writeString(Nodes.config.pathTowns, jsonStr)
 
         // if backup timestamp millis timestamp (using System.currentTimeMillis())
         // was provided, copy this saved world state to backup folder
@@ -78,17 +65,15 @@ internal class TaskSaveBackup(
 ) : Runnable {
     override fun run() {
         if (Files.exists(Nodes.config.pathTowns)) {
-            Files.createDirectories(Nodes.config.pathBackup) // create backup folder if it does not exist
-
             // save towns file backup
             val date = Date(timestamp)
             val backupName = "towns.${BACKUP_DATE_FORMATTER.format(date)}.json"
             val pathBackup = Nodes.config.pathBackup.resolve(backupName)
-            Files.copy(Nodes.config.pathTowns, pathBackup)
+            AtomicFiles.copy(Nodes.config.pathTowns, pathBackup)
         }
 
         // save last backup timestamp to file
-        Files.writeString(Nodes.config.pathLastBackupTime, timestamp.toString())
+        AtomicFiles.writeString(Nodes.config.pathLastBackupTime, timestamp.toString())
     }
 }
 
@@ -98,7 +83,7 @@ class TaskSaveBuildings(
 ) : Runnable {
     override fun run() {
         val jsonStr = Serializer.buildingsToJson(buildingsSnapshot)
-        writeStringAtomically(pathBuildingsSave, jsonStr)
+        AtomicFiles.writeString(pathBuildingsSave, jsonStr)
     }
 }
 

@@ -46,6 +46,7 @@ import net.aechronis.nodes.objects.WaypointMenu
 import net.aechronis.nodes.serdes.Deserializer
 import net.aechronis.nodes.tasks.IncomeManager
 import net.aechronis.nodes.tasks.SaveManager
+import net.aechronis.nodes.tasks.SerialSaveQueue
 import net.aechronis.nodes.tasks.TaskSaveBackup
 import net.aechronis.nodes.tasks.TaskSaveBuildings
 import net.aechronis.nodes.tasks.TaskSaveWorld
@@ -86,7 +87,26 @@ object Nodes {
     var chunkToBuilding: HashMap<List<Int>, Building> = hashMapOf()
     internal var lastBackupTime: Long = 0
     val war = FlagWar
+
+    // Guards needsSave/saveRevision/lastQueuedRevision/backupPending -- previously saveWorld() read
+    // and reset needsSave with no lock at all, a real check-then-act race between the periodic
+    // SaveManager tick and any other caller (shutdown, /nodesadmin save) running concurrently: both
+    // could see needsSave=true, both build a save task, and whichever finished last could stamp
+    // lastBackupTime/reset needsSave over the other's result. saveRevision/lastQueuedRevision let a
+    // save that's already in flight represent state newer than what's on disk without forcing every
+    // caller to block on it.
+    private val saveStateLock = Any()
+    private val saveQueue = SerialSaveQueue()
+    private var saveRevision = 0L
+    private var lastQueuedRevision = -1L
+    private var backupPending = false
     internal var needsSave: Boolean = false
+        set(value) {
+            synchronized(saveStateLock) {
+                field = value
+                if (value) saveRevision++
+            }
+        }
     internal val hiddenOreInvalidBlocks: OreBlockCache = OreBlockCache()
     lateinit var config: NodesConfig
 
@@ -177,7 +197,6 @@ object Nodes {
         towns.values.forEach { town -> if (town.income.pushToStorage(true)) town.needsUpdate() }
         if (FlagWar.enabled) FlagWar.cleanup()
         saveWorld(checkIfNeedsSave = false, async = false)
-        Files.writeString(config.pathLastBackupTime, System.currentTimeMillis().toString())
     }
 
     internal fun loadResources(json: JsonObject) {
@@ -322,26 +341,110 @@ object Nodes {
         }
     }
 
-    internal fun saveWorld(checkIfNeedsSave: Boolean = true, async: Boolean = false) {
-        if (!config.save) return
+    // Previously: needsSave was read and reset with no lock, and each save ran on its own
+    // fire-and-forget CompletableFuture with no ordering guarantee -- two overlapping async saves
+    // (e.g. a periodic SaveManager tick landing during a manual /nodesadmin save) could interleave
+    // or race on which one's TaskSaveWorld actually wins, and a failed save silently dropped
+    // needsSave back to false as if it had succeeded. Now: state changes happen under
+    // saveStateLock, actual disk I/O is serialized through saveQueue (one save runs at a time, in
+    // order), and saveRevision/lastQueuedRevision let a save already in flight represent state
+    // newer than what's on disk without needing to block every caller on it. A failed save restores
+    // needsSave so the next tick retries instead of silently losing the pending change.
+    fun saveWorld(
+        checkIfNeedsSave: Boolean = true,
+        async: Boolean = false,
+    ): CompletableFuture<Void> {
+        if (!config.save) return CompletableFuture.completedFuture(null)
         val current = System.currentTimeMillis()
-        val backup = current > lastBackupTime + config.backupPeriod
-        val backupTimestamp = if (backup) current.also { lastBackupTime = it } else null
-        if (needsSave || !checkIfNeedsSave) {
-            saveWorldPreprocess()
-            val timeUpdate = measureNanoTime {
-                val task = TaskSaveWorld(residents.values.map { it.getSaveState() }, towns.values.map { it.getSaveState() }, nations.values.map { it.getSaveState() }, backupTimestamp)
-                if (async) CompletableFuture.runAsync { task.run() } else task.run()
-                needsSave = false
+        val request =
+            try {
+                synchronized(saveStateLock) {
+                    val dirtyRevision = saveRevision
+                    val saveState = !checkIfNeedsSave || (needsSave && dirtyRevision > lastQueuedRevision)
+                    val backup = !backupPending && current > lastBackupTime + config.backupPeriod
+                    if (!saveState && !backup) {
+                        val pending = saveQueue.current()
+                        if (!async) pending.join()
+                        return pending
+                    }
+
+                    val backupTimestamp = current.takeIf { backup }
+
+                    if (saveState) {
+                        saveWorldPreprocess()
+                        lastQueuedRevision = dirtyRevision
+                        SaveRequest(
+                            worldTask = TaskSaveWorld(
+                                residents.values.map { it.getSaveState() },
+                                towns.values.map { it.getSaveState() },
+                                nations.values.map { it.getSaveState() },
+                                backupTimestamp,
+                            ),
+                            buildingTask = TaskSaveBuildings(buildings.map { it.getSaveState() }, config.pathBuildings),
+                            revision = dirtyRevision,
+                            backupTimestamp = backupTimestamp,
+                        ).also { if (backupTimestamp != null) backupPending = true }
+                    } else {
+                        SaveRequest(
+                            backupTask = TaskSaveBackup(backupTimestamp!!),
+                            backupTimestamp = backupTimestamp,
+                        ).also { backupPending = true }
+                    }
+                }
+            } catch (error: Throwable) {
+                synchronized(saveStateLock) {
+                    needsSave = true
+                    backupPending = false
+                }
+                System.err.println("[Nodes] Failed to prepare world save: ${error.message}")
+                error.printStackTrace()
+                val failure = CompletableFuture.failedFuture<Void>(error)
+                if (!async) failure.join()
+                return failure
             }
-            println("[Nodes] Saving world: ${timeUpdate}ns")
-            val buildingTask = TaskSaveBuildings(buildings.map { it.getSaveState() }, config.pathBuildings)
-            if (async) CompletableFuture.runAsync { buildingTask.run() } else buildingTask.run()
-        } else if (backup) {
-            val task = TaskSaveBackup(backupTimestamp!!)
-            if (async) CompletableFuture.runAsync { task.run() } else task.run()
-        }
+
+        val future = enqueueSave(request)
+        if (!async) future.join()
+        return future
     }
+
+    private fun enqueueSave(request: SaveRequest): CompletableFuture<Void> {
+        val future =
+            saveQueue.submit {
+                val elapsed =
+                    measureNanoTime {
+                        request.worldTask?.run()
+                        request.buildingTask?.run()
+                        request.backupTask?.run()
+                    }
+                println("[Nodes] Saved world in ${elapsed}ns")
+            }
+
+        future.whenComplete { _, error ->
+            synchronized(saveStateLock) {
+                if (error == null) {
+                    request.revision?.let { revision -> if (saveRevision == revision) needsSave = false }
+                    request.backupTimestamp?.let { timestamp -> lastBackupTime = timestamp }
+                } else if (request.revision != null) {
+                    needsSave = true
+                }
+                if (request.backupTimestamp != null) backupPending = false
+            }
+            if (error != null) {
+                System.err.println("[Nodes] Failed to save world: ${error.message}")
+                error.printStackTrace()
+            }
+        }
+        return future
+    }
+
+    private data class SaveRequest(
+        val worldTask: TaskSaveWorld? = null,
+        val buildingTask: TaskSaveBuildings? = null,
+        val backupTask: TaskSaveBackup? = null,
+        val revision: Long? = null,
+        val backupTimestamp: Long? = null,
+    )
 
     internal fun saveWorldPreprocess() {
         towns.values.forEach { town -> if (town.income.pushToStorage(false)) town.needsUpdate() }
