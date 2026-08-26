@@ -7,6 +7,7 @@ import net.minestom.server.timer.Task
 import net.morellia.combat.listeners.AimingListener
 import net.morellia.combat.listeners.FireListener
 import net.morellia.combat.listeners.MeleeListener
+import net.morellia.combat.listeners.MovementListener
 import net.morellia.combat.listeners.PlayerDisconnectListener
 import net.morellia.combat.listeners.ReloadListener
 import net.morellia.combat.listeners.WeaponSwapListener
@@ -29,6 +30,8 @@ object Combat {
     /** 0.0-1.0 fraction of the way through the in-progress reload, if any -- see ReloadListener/ActionBarManager. */
     internal val reloadProgress = ConcurrentHashMap<Player, Double>()
     internal val aimingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
+    /** Players currently holding a WASD movement key -- see MovementListener, read by Gun.fire for spread. */
+    internal val movingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
     internal val meleeLastAttackTimes = ConcurrentHashMap<Player, Long>()
 
     fun initialize() {
@@ -37,6 +40,7 @@ object Combat {
         FireListener.init()
         ReloadListener.init()
         AimingListener.init()
+        MovementListener.init()
         MeleeListener.init()
         WeaponSwapListener.init()
         PlayerDisconnectListener.init()
@@ -51,6 +55,7 @@ object Combat {
         reloadTasks.remove(player)?.cancel()
         reloadProgress.remove(player)
         aimingPlayers.remove(player)
+        movingPlayers.remove(player)
         meleeLastAttackTimes.remove(player)
     }
 }

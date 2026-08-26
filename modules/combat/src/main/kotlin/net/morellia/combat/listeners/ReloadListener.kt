@@ -71,37 +71,25 @@ object ReloadListener {
 
     /**
      * Reloads always go from empty to a full [Gun.magazineSize] (see [tryStartReload]'s ammo==0
-     * gate), so the reserve cost is one loose [Gun.ammo] item per round in the magazine, not a
-     * flat one-item "fully loaded clip" cost -- a magazineSize=1 musket and a magazineSize=5 rifle
-     * both spend real rounds 1:1, they just spend a different count of them per reload.
+     * gate), and [Gun.ammo] represents one full magazine, not one loose round -- a magazineSize=1
+     * musket and a magazineSize=50 Gatling drum both cost exactly one [Gun.ammo] stack unit per
+     * reload, they just refill a different number of rounds from it.
      */
-    private fun totalReserveAmmo(
-        player: Player,
-        gun: Gun,
-    ): Int = player.inventory.itemStacks.filter { isReserveAmmoStack(it, gun) }.sumOf { it.amount() }
-
     private fun hasReserveAmmo(
         player: Player,
         gun: Gun,
-    ): Boolean = totalReserveAmmo(player, gun) >= gun.magazineSize
+    ): Boolean = player.inventory.itemStacks.any { isReserveAmmoStack(it, gun) }
 
-    /** Consumes [Gun.magazineSize] total reserve ammo, spanning multiple stacks if one isn't enough. */
+    /** Consumes exactly one magazine item from the first matching stack found. */
     private fun consumeReserveAmmo(
         player: Player,
         gun: Gun,
     ): Boolean {
-        if (totalReserveAmmo(player, gun) < gun.magazineSize) return false
-
         val inventory = player.inventory
-        var remaining = gun.magazineSize
-        for (slot in inventory.itemStacks.indices) {
-            if (remaining <= 0) break
-            val stack = inventory.itemStacks[slot]
-            if (!isReserveAmmoStack(stack, gun)) continue
-            val taken = minOf(remaining, stack.amount())
-            inventory.setItemStack(slot, stack.withAmount(stack.amount() - taken))
-            remaining -= taken
-        }
+        val slot = inventory.itemStacks.indexOfFirst { isReserveAmmoStack(it, gun) }
+        if (slot < 0) return false
+        val stack = inventory.itemStacks[slot]
+        inventory.setItemStack(slot, stack.withAmount(stack.amount() - 1))
         return true
     }
 

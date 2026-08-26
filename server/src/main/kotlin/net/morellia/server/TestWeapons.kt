@@ -75,6 +75,38 @@ object TestWeapons {
             attackSpeed = 2.0,
         )
 
+    val shotgunShell =
+        Ammo(
+            name = "shotgun_shell",
+            ammoType = AmmoType.SHOTGUN,
+            itemName = Component.text("Shotgun Shell"),
+        )
+
+    // Demonstrates pelletCount (docs/HANDOFF.md's guns plan) -- a double-barrel-style shotgun,
+    // wide spread and short falloff range, one shell per barrel.
+    val shotgun =
+        Gun(
+            name = "shotgun",
+            itemName = Component.text("Shotgun"),
+            ammo = shotgunShell,
+            magazineSize = 2,
+            pelletCount = 8,
+            damageFalloff =
+                DamageFalloff(
+                    maxDamage = 4f,
+                    falloffStartRange = 5.0,
+                    falloffEndRange = 15.0,
+                    minDamage = 1f,
+                ),
+            automatic = false,
+            cooldownMs = 1200,
+            reloadMs = 2500,
+            recoilMin = 3f,
+            recoilMax = 5f,
+            spreadMin = 3f,
+            spreadMax = 8f,
+        )
+
     val artilleryShell =
         Ammo(
             name = "artillery_shell",
@@ -109,6 +141,6 @@ object TestWeapons {
         )
 
     fun register() {
-        Item.registerItems(musketBall, musket, bayonet, artilleryShell, fieldGun)
+        Item.registerItems(musketBall, musket, bayonet, artilleryShell, fieldGun, shotgunShell, shotgun)
     }
 }

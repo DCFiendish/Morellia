@@ -27,6 +27,11 @@ object DevLoadout {
                 TestWeapons.fieldGun.setAmmo(TestWeapons.fieldGun.toItemStack(), TestWeapons.fieldGun.magazineSize),
             )
             inventory.setItemStack(4, TestWeapons.artilleryShell.toItemStack().withAmount(8))
+            inventory.setItemStack(
+                5,
+                TestWeapons.shotgun.setAmmo(TestWeapons.shotgun.toItemStack(), TestWeapons.shotgun.magazineSize),
+            )
+            inventory.setItemStack(6, TestWeapons.shotgunShell.toItemStack().withAmount(8))
         }
     }
 }

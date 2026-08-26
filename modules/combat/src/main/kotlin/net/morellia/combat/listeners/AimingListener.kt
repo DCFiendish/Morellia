@@ -37,8 +37,6 @@ import net.morellia.combat.objects.Item
  */
 object AimingListener {
     private val AIM_SPEED_MODIFIER_ID = Key.key("${Tags.NAMESPACE}:combat.aiming_speed")
-    private val AIM_SPEED_MODIFIER =
-        AttributeModifier(AIM_SPEED_MODIFIER_ID, -0.5, AttributeOperation.ADD_MULTIPLIED_TOTAL)
     private val SCOPE_VIGNETTE_HELMET = ItemStack.of(Material.CARVED_PUMPKIN)
 
     private fun onInput(event: PlayerInputEvent) {
@@ -64,8 +62,9 @@ object AimingListener {
         gun: Gun,
     ) {
         if (!Combat.aimingPlayers.add(player)) return
-        player.getAttribute(Attribute.MOVEMENT_SPEED).addModifier(AIM_SPEED_MODIFIER)
-        if (gun.hasAmmo(player.itemInMainHand)) {
+        val speedModifier = AttributeModifier(AIM_SPEED_MODIFIER_ID, -gun.adsZoomStrength, AttributeOperation.ADD_MULTIPLIED_TOTAL)
+        player.getAttribute(Attribute.MOVEMENT_SPEED).addModifier(speedModifier)
+        if (gun.adsVignette && gun.hasAmmo(player.itemInMainHand)) {
             player.sendPacket(EntityEquipmentPacket(player.entityId, mapOf(EquipmentSlot.HELMET to SCOPE_VIGNETTE_HELMET)))
         }
         gun.refreshModel(player)

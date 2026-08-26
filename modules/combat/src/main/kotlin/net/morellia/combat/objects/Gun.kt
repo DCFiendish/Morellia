@@ -31,6 +31,7 @@ class Gun(
     val itemModelReloading: String? = itemModel,
     val itemModelAiming: String? = itemModel,
     material: Material = Material.CROSSBOW,
+    /** Magazine item consumed 1-per-reload regardless of [magazineSize] -- see ReloadListener. */
     val ammo: Ammo,
     val magazineSize: Int,
     val damageFalloff: DamageFalloff,
@@ -39,10 +40,17 @@ class Gun(
     val automatic: Boolean,
     val cooldownMs: Long,
     val reloadMs: Long,
+    /** Every gun kicks by at least [recoilMin] -- there is no zero-recoil weapon by design. */
     val recoilMin: Float,
     val recoilMax: Float,
     val spreadMin: Float,
     val spreadMax: Float,
+    /** Rays fired per trigger pull, e.g. a shotgun's pellet count -- one ammo/sound/recoil per pull regardless. */
+    val pelletCount: Int = 1,
+    /** Movement-speed reduction (0-1 fraction) applied while aiming this gun -- see AimingListener. */
+    val adsZoomStrength: Double = 0.5,
+    /** Whether aiming this gun applies the pumpkin-vignette trick -- see AimingListener. */
+    val adsVignette: Boolean = true,
     val soundFire: Sound = Sound.sound(Key.key("${Tags.NAMESPACE}:$name.fire"), Sound.Source.PLAYER, 5f, 1f),
     val soundReload: Sound = Sound.sound(Key.key("${Tags.NAMESPACE}:$name.reload"), Sound.Source.PLAYER, 3f, 1f),
     /**
@@ -59,6 +67,8 @@ class Gun(
         require(maxRange.isFinite() && maxRange > 0.0) { "maxRange must be a positive finite number" }
         require(cooldownMs > 0) { "cooldownMs must be > 0" }
         require(reloadMs > 0) { "reloadMs must be > 0" }
+        require(recoilMin > 0f) { "recoilMin must be > 0 -- every gun has at least some recoil" }
+        require(pelletCount > 0) { "pelletCount must be > 0" }
     }
 
     /** Reads remaining ammo from [stack]'s durability-bar encoding (see [setAmmo]). */
@@ -112,10 +122,16 @@ class Gun(
     }
 
     /**
-     * Fires one hitscan shot from [player]'s eye position. Returns false without effect if the
-     * cooldown hasn't elapsed, the gun is empty, or a reload is in progress. Cooldown is enforced
-     * here unconditionally regardless of [automatic] -- no gun can be macro'd past its own
-     * configured rate; see FireListener's kdoc for what [automatic] actually changes.
+     * Fires [pelletCount] hitscan ray(s) from [player]'s eye position (one for a normal gun, many
+     * for a shotgun -- one ammo/sound/recoil charge regardless of pellet count). Returns false
+     * without effect if the cooldown hasn't elapsed, the gun is empty, or a reload is in progress.
+     * Cooldown is enforced here unconditionally regardless of [automatic] -- no gun can be macro'd
+     * past its own configured rate; see FireListener's kdoc for what [automatic] actually changes.
+     *
+     * Spread and recoil are independent: spread (aim inaccuracy) is fully suppressed while crouched
+     * or while not holding a movement key -- see Combat.movingPlayers/aimingPlayers -- but recoil
+     * (the camera kick) always applies at least [recoilMin], only reduced (never zeroed) while
+     * crouched/aiming.
      */
     fun fire(player: Player): Boolean {
         val instance = player.instance ?: return false
@@ -129,32 +145,37 @@ class Gun(
 
         Combat.playerLastFireTimes[player] = now
 
-        val aiming = player in Combat.aimingPlayers
-        val spreadMultiplier = if (aiming) AIM_SPREAD_MULTIPLIER else 1f
-        val spreadAngle = (spreadMin + (spreadMax - spreadMin) * Random.nextFloat()) * spreadMultiplier
-        val spreadDirectionRad = Math.toRadians((Random.nextFloat() * 360f).toDouble())
-        val offsetYaw = player.position.yaw + spreadAngle * cos(spreadDirectionRad).toFloat()
-        val offsetPitch = player.position.pitch + spreadAngle * sin(spreadDirectionRad).toFloat()
+        val crouching = player in Combat.aimingPlayers
+        val moving = player in Combat.movingPlayers
+        val spreadSuppressed = crouching || !moving
+        val recoilMultiplier = if (crouching) AIM_RECOIL_MULTIPLIER else 1f
 
-        val origin = player.position.withView(offsetYaw, offsetPitch).add(0.0, player.eyeHeight, 0.0)
-        val ray = Ray(origin, origin.direction().mul(maxRange))
+        val potentialTargets = instance.entities.filterIsInstance<LivingEntity>().filter { it != player }
 
-        val blockHit = ray.firstBlock(instance)
-        val entityHit =
-            ray.firstEntity(
-                instance.entities.filterIsInstance<LivingEntity>().filter { it != player },
-            )
+        repeat(pelletCount) {
+            val spreadAngle = if (spreadSuppressed) 0f else spreadMin + (spreadMax - spreadMin) * Random.nextFloat()
+            val spreadDirectionRad = Math.toRadians((Random.nextFloat() * 360f).toDouble())
+            val offsetYaw = player.position.yaw + spreadAngle * cos(spreadDirectionRad).toFloat()
+            val offsetPitch = player.position.pitch + spreadAngle * sin(spreadDirectionRad).toFloat()
 
-        val blockHitDistance = blockHit?.t ?: Double.POSITIVE_INFINITY
-        val entityHitDistance = entityHit?.t ?: Double.POSITIVE_INFINITY
+            val shotOrigin = player.position.withView(offsetYaw, offsetPitch).add(0.0, player.eyeHeight, 0.0)
+            val ray = Ray(shotOrigin, shotOrigin.direction().mul(maxRange))
 
-        if (entityHit != null && entityHitDistance < blockHitDistance) {
-            val damage = damageFalloff.damageAt(entityHitDistance)
-            entityHit.obj.damage(Damage.fromProjectile(player, null, damage))
+            val blockHit = ray.firstBlock(instance)
+            val entityHit = ray.firstEntity(potentialTargets)
+
+            val blockHitDistance = blockHit?.t ?: Double.POSITIVE_INFINITY
+            val entityHitDistance = entityHit?.t ?: Double.POSITIVE_INFINITY
+
+            if (entityHit != null && entityHitDistance < blockHitDistance) {
+                val damage = damageFalloff.damageAt(entityHitDistance)
+                entityHit.obj.damage(Damage.fromProjectile(player, null, damage))
+            }
         }
 
-        instance.playSound(soundFire, origin.x, origin.y, origin.z)
-        recoil(player, spreadMultiplier)
+        val firePosition = player.position.add(0.0, player.eyeHeight, 0.0)
+        instance.playSound(soundFire, firePosition.x, firePosition.y, firePosition.z)
+        recoil(player, recoilMultiplier)
         player.itemInMainHand = setAmmo(stack, getAmmo(stack) - 1)
         refreshModel(player)
         return true
@@ -177,6 +198,7 @@ class Gun(
     }
 
     companion object {
-        private const val AIM_SPREAD_MULTIPLIER = 0.4f
+        /** Recoil while crouched/aiming is reduced, never eliminated -- pairs with the recoilMin > 0 guarantee. */
+        private const val AIM_RECOIL_MULTIPLIER = 0.4f
     }
 }
