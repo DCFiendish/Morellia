@@ -5,6 +5,7 @@ import net.minestom.server.item.Material
 
 /** Broad ammo families -- extend as new weapon categories need their own reserve ammo item. */
 enum class AmmoType {
+    PISTOL,
     RIFLE,
     SHOTGUN,
     MACHINE_GUN,

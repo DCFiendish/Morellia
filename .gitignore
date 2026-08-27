@@ -2,6 +2,7 @@ desktop.ini
 .claude/
 *.iml
 .idea/
+*.log
 
 # Root/aggregator Gradle build output (each module has its own nested .gitignore for its own build/)
 /build/

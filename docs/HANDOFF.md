@@ -248,6 +248,91 @@ working tree (`modules/combat/`, plus edits to `FlagWar.kt`, `TestWeapons.kt`, `
   zoom/crosshair/held-pose change). None of these are scoped yet — first thing to nail down in
   whatever session picks this up next.
 
+## Status update (2026-08-26): more weapon assets sourced; ADS "peering down the barrel" pose is BROKEN, root cause not found
+
+New real models/textures added to `resourcepack/`, all from the same memava "WWI & WWII rifles"
+pack (MIT), credited in `resourcepack/CREDITS.md`: **Springfield**, **Karabiner** (real rifle
+models), and three melee knives (**US Trench Knife**, **Nahkampfmesser**, **Couteau Poignard**) —
+the knives are all placeholder substitutions using the pack's bayonet models (no real trench-knife
+assets exist in the source pack), flagged in CREDITS.md to replace later. All wired into
+`TestWeapons.kt`/`DevLoadout.kt` and confirmed rendering correctly in the dev test client (see
+`morellia-testclient` reference memory).
+
+**ADS work, done and working:**
+- `Gun.adsVignette` now defaults to `false` (was `true`) — the full-screen pumpkin-vignette
+  tunnel-vision trick is a sniper-scope effect, not appropriate for iron-sight aiming on every gun.
+  Matches how `Aechronis/combat`'s own `ModelManager.kt` gates it behind a `gun.sniper` flag we
+  don't have (and don't need) yet. Confirmed working in-game: aiming no longer blacks out
+  peripheral vision, only the existing movement-speed-based FOV zoom applies.
+- The aim/crouch toggle, FOV zoom, and the underlying `itemModelAiming` swap mechanism itself are
+  all confirmed working correctly server-side (see bug section below for exactly how this was
+  verified).
+
+**ADS work, BROKEN — this is where the user stopped for the day:**
+Goal: aiming a gun should visually reposition the held model to look like peering down the
+sights (centered under the crosshair, muzzle just below it), the way `Aechronis/aechronis`'s
+`ak47-aiming.json` does it for their AK47 (repositioned `firstperson_righthand`/
+`firstperson_lefthand` display transform, swapped in via `itemModelAiming`). Built
+`musket-aiming.json`/`springfield-aiming.json`/`karabiner-aiming.json` (clones of the base model
+with only the `display` block + a tiny geometry nudge changed) plus matching `items/*-aiming.json`
+wrappers, wired via `itemModelAiming` in `TestWeapons.kt`. **The result never visually changes
+in-game** — aiming the musket looks pixel-identical to the normal hip-fire hold, no matter what the
+`display.firstperson_righthand` translation/rotation/scale values are set to.
+
+Debugged extensively, ruled out the obvious causes:
+- **Server-side swap is confirmed correct.** Added a temp `println` in `Gun.refreshModel` (still in
+  the code, marked `TEMP DEBUG` — remove once this is fixed) that logs the exact model string being
+  applied. Confirmed via live server log: `aiming=true currentComponent=morellia:musket
+  targetModel=morellia:musket-aiming` fires correctly every time the player aims, and reverts
+  correctly on release.
+- **The resource pack served over HTTP genuinely contains the new transform values** — downloaded
+  the live `resourcepack.zip` from `localhost:8000` directly and inspected the bytes inside
+  `musket-aiming.json`, confirmed they matched what was authored (not a stale/cached copy).
+- **The item-model swap mechanism itself works fine for a genuinely different target.** Two direct
+  tests, both confirmed visually by the user: temporarily setting the musket's `itemModelAiming` to
+  `minecraft:diamond_sword` correctly turned it into a diamond sword on aim; setting it to
+  `morellia:us_trench_knife` (an existing, already-working custom model) correctly turned it into
+  the knife. So swapping to *any other* model — vanilla or custom — renders correctly and
+  immediately, no reconnect needed.
+- **Only `musket-aiming.json` specifically — a near-byte-identical clone of `musket.json`'s own
+  `elements`/`textures`, differing only in `display` and one coordinate nudged by 0.0001 — fails to
+  render any differently from the base `musket.json`.** This is the actual unresolved mystery.
+
+**Leading theory, not yet confirmed or disproven**: the client may be deduping/caching baked item
+meshes by geometry content, so two item ids pointing at near-identical `elements` arrays collapse
+onto the same baked model (including its baked-in display transform) despite having different item
+ids and different `display` blocks in their source JSON. The 0.0001 nudge to one vertex was an
+attempt to break this and did not help, but that may simply not have been a large-enough content
+change to defeat whatever comparison the client is doing (rounding/quantization is plausible).
+**Next things to try, in order**:
+1. Make the aiming model's `elements` *substantially* different from the base (not a tiny nudge) —
+   e.g. reuse the trench-knife or another already-working custom model's actual geometry, or hand-
+   author a simple distinguishable placeholder shape — to conclusively confirm/deny the dedup-cache
+   theory.
+2. If that fixes it, the real fix is understanding exactly what content the client hashes/compares
+   for this dedup (texture reference? element count? something else?) so the real aiming poses can
+   be built without accidentally tripping it — likely means the aiming variant's geometry needs to
+   diverge more than "same mesh, moved display transform" for this Minecraft build.
+3. If a substantially different `elements` array *still* doesn't render differently, the dedup
+   theory is wrong and this needs a fresh angle — worth re-checking whether this is a known bug/
+   quirk specific to Minecraft 26.2's very recent, still-unofficial model pipeline (see the
+   `morellia-testclient` reference memory — this version already has other known-unusual behavior:
+   no official/Yarn mappings, `quickPlayMultiplayer` host/port parsing bug, etc.).
+4. Also worth checking Aechronis's actual `ak47`/`ak47-aiming` pair for whether their two files'
+   `elements` arrays are meaningfully geometrically different from each other (not just their
+   `display` blocks) — if their working example also happens to diverge in geometry, not just
+   display, that would support the dedup theory directly.
+
+Other resourcepack-side findings from this investigation, still true regardless of the bug above:
+- This mesh (extracted from a crossbow-predicate wrapper, not purpose-built) is unusually long
+  along its local Z axis — pulling its `display` translation closer to camera has an outsized
+  effect on apparent size (learned by way of massively oversizing it on the first two attempts).
+  Any future aiming-pose tuning on these rifle models should expect that sensitivity.
+- The base (non-aiming) `firstperson_righthand` pose's small residual rotation (a few degrees on
+  x/y/z, e.g. musket's `[3.83,-5.03,3.44]`) does NOT explain the diagonal "held to the side" look on
+  its own — zeroing it out produced no visible change either (before the dedup issue was even
+  suspected), so that specific fix attempt is a dead end, not something to re-try.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically
@@ -389,6 +474,8 @@ Pterodactyl server UUID, volume path, and container ownership details are in
 
 ## What's genuinely still open (not urgent, not touched recently)
 
+- **New, 2026-08-26, actually next up**: the ADS "peering down the barrel" aiming-pose render bug —
+  see the status update above for the full investigation. Pick up at "Next things to try" there.
 - **New, 2026-08-25/26, actually next up**: Morellia's own `server/build.gradle.kts` pins are stale
   against what's now on `nodes`/`vanilla` master (`40b2270`/`a074e09` vs. the current `6f1f9dd`/
   `96b593f`) — see the nodes/vanilla status update above for the exact bump + follow-up work.

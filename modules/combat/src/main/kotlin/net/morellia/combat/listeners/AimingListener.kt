@@ -29,11 +29,14 @@ import net.morellia.combat.objects.Item
  *   ADD_MULTIPLIED_TOTAL modifier on that attribute while aiming gets a real vanilla-client zoom
  *   "for free", no resource pack or client mod involved, and doubles as a realistic ADS movement
  *   penalty rather than being a purely cosmetic hack.
- * - **Vignette**: wearing a carved pumpkin as a helmet is hardcoded vanilla-client behaviour that
- *   blocks peripheral vision, exactly the tunnel-vision look of peering through a sight. Spoofing
- *   just the helmet slot's *equipment packet* to this one player (not a real inventory change --
- *   no fire-resistance, no zombie-pigman-aggro side effect, and nothing broadcast to anyone else)
- *   gets that effect without touching the player's actual armor.
+ * - **Vignette** (opt-in via Gun.adsVignette, off by default): wearing a carved pumpkin as a helmet
+ *   is hardcoded vanilla-client behaviour that blocks peripheral vision, exactly the tunnel-vision
+ *   look of a telescopic sniper scope -- not appropriate for a gun aiming down iron sights, which
+ *   gets its "peering down the barrel" look from itemModelAiming's repositioned first-person
+ *   transform instead (see Gun.refreshModel). Spoofing just the helmet slot's *equipment packet* to
+ *   this one player (not a real inventory change -- no fire-resistance, no zombie-pigman-aggro side
+ *   effect, and nothing broadcast to anyone else) gets that effect without touching the player's
+ *   actual armor, reserved for an actual scoped weapon.
  */
 object AimingListener {
     private val AIM_SPEED_MODIFIER_ID = Key.key("${Tags.NAMESPACE}:combat.aiming_speed")

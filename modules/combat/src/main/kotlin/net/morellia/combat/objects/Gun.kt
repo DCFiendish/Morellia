@@ -49,8 +49,14 @@ class Gun(
     val pelletCount: Int = 1,
     /** Movement-speed reduction (0-1 fraction) applied while aiming this gun -- see AimingListener. */
     val adsZoomStrength: Double = 0.5,
-    /** Whether aiming this gun applies the pumpkin-vignette trick -- see AimingListener. */
-    val adsVignette: Boolean = true,
+    /**
+     * Whether aiming this gun applies the pumpkin-vignette trick -- see AimingListener. Defaults
+     * off: the vignette is a full-tunnel-vision "sniper scope" look, not appropriate for a gun
+     * that's just aiming down iron sights (that's carried entirely by itemModelAiming's repositioned
+     * first-person transform + the movement-speed FOV zoom). Reserve true for an actual scoped
+     * weapon later.
+     */
+    val adsVignette: Boolean = false,
     val soundFire: Sound = Sound.sound(Key.key("${Tags.NAMESPACE}:$name.fire"), Sound.Source.PLAYER, 5f, 1f),
     val soundReload: Sound = Sound.sound(Key.key("${Tags.NAMESPACE}:$name.reload"), Sound.Source.PLAYER, 3f, 1f),
     /**
@@ -100,6 +106,10 @@ class Gun(
                 player in Combat.aimingPlayers -> itemModelAiming
                 else -> itemModel
             } ?: return
+        // TEMP DEBUG (2026-08-26 ADS investigation, see docs/HANDOFF.md) -- confirms this method
+        // really does resolve/apply the intended model string server-side; remove once the aiming
+        // display-transform render bug below is actually root-caused and fixed.
+        println("[DEBUG refreshModel] player=${player.username} aiming=${player in Combat.aimingPlayers} currentComponent=${stack.get(DataComponents.ITEM_MODEL)} targetModel=$model")
         if (stack.get(DataComponents.ITEM_MODEL) != model) {
             player.itemInMainHand = stack.with(DataComponents.ITEM_MODEL, model)
         }

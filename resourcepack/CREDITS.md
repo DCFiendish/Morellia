@@ -14,6 +14,59 @@ recorded here as they're added.
   referenced directly via our own `item_model` component. Texture reference inside the model JSON
   was changed from `item/rifles/mosin` (implicit `minecraft:` namespace) to `morellia:item/musket`;
   no other edits to the model geometry.
+- `musket-aiming.json`/`.png` (same texture, reused) is a derivative of this model with only the
+  `firstperson_righthand`/`firstperson_lefthand` display translation edited, for the ADS "peering
+  down the barrel" pose -- see `AimingListener.kt`. No other changes.
+
+## Springfield (`assets/morellia/models/item/springfield.json`, `assets/morellia/textures/item/springfield.png`)
+
+- **Source**: "WWI & WWII rifles" resource pack by memava — https://modrinth.com/resourcepack/rifles
+  (local copy used: v8.5, downloaded directly by the user rather than pulled from Modrinth)
+- **License**: MIT (as stated on the Modrinth listing)
+- **Pulled**: 2026-08-26
+- **Notes**: original asset is the pack's Springfield model (`item/rifles/springfieldch.json` +
+  `item/rifles/springfield.png`), same extraction pattern as the musket above (texture reference
+  changed from `item/rifles/springfield` to `morellia:item/springfield`, no geometry edits).
+- `springfield-aiming.json` is a derivative with only the first-person display translation edited
+  for the ADS pose, same as the musket's aiming variant above.
+
+## Karabiner (`assets/morellia/models/item/karabiner.json`, `assets/morellia/textures/item/karabiner.png`)
+
+- **Source**: same pack as above (memava's "WWI & WWII rifles", v8.5), MIT license.
+- **Pulled**: 2026-08-26
+- **Notes**: original asset is the pack's Kar98k model (`item/rifles/kar98kch.json` +
+  `item/rifles/kar98k.png`) — the mind-map plan names this weapon generically as "Karabiner"; this is
+  the specific real-world rifle it maps to. Texture references changed from `item/rifles/kar98k` to
+  `morellia:item/karabiner`, no geometry edits.
+- `karabiner-aiming.json` is a derivative with only the first-person display translation edited for
+  the ADS pose, same as the musket's aiming variant above.
+
+## US M1918 Mk1 trench knife (`assets/morellia/models/item/us_trench_knife.json`, `.../us_trench_knife.png`)
+
+- **Source**: same pack (memava's "WWI & WWII rifles", v8.5), MIT license.
+- **Pulled**: 2026-08-26
+- **Notes**: **placeholder substitution, not the actual weapon** — the pack has no standalone trench
+  knife models, only rifle bayonets. Reused the pack's US M1892 (Krag) bayonet model
+  (`item/bayonets/usm1892.json`/`.png`) as the closest available US WWI-era blade silhouette. Replace
+  with a real M1918 Mk1 trench-knife model when one is sourced.
+
+## Nahkampfmesser (`assets/morellia/models/item/nahkampfmesser.json`, `.../nahkampfmesser.png`)
+
+- **Source**: same pack (memava's "WWI & WWII rifles", v8.5), MIT license.
+- **Pulled**: 2026-08-26
+- **Notes**: **placeholder substitution** — reused the pack's German S84/98 (Mauser/Kar98k) bayonet
+  model (`item/bayonets/s8498.json`/`.png`) as the closest available German-made blade. Replace with a
+  real Nahkampfmesser model when one is sourced.
+
+## Couteau Poignard Modele 1916 (`assets/morellia/models/item/couteau_poignard.json`, `.../couteau_poignard.png`)
+
+- **Source**: same pack (memava's "WWI & WWII rifles", v8.5), MIT license.
+- **Pulled**: 2026-08-26
+- **Notes**: **placeholder substitution** — reused the pack's French "Rosalie" bayonet model
+  (`item/bayonets/rosalie.json`/`.png`, the French Lebel rifle's cruciform bayonet, nicknamed "Rosalie"
+  by WWI soldiers) as the closest available French WWI blade, even though the real Modele 1916 is a
+  separate one-handed push-dagger design, not this rifle bayonet. Replace with a real model when
+  sourced.
 
 ## Musket fire sound (`assets/morellia/sounds/guns/musket/fire.ogg`)
 

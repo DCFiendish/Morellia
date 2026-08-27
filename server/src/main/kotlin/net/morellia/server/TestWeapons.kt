@@ -49,6 +49,7 @@ object TestWeapons {
             // in turn references the raw model -- it does not point at the raw model directly. This
             // value is the definition's id ("musket"), not the model's path ("item/musket").
             itemModel = "morellia:musket",
+            itemModelAiming = "morellia:musket-aiming",
             ammo = musketBall,
             magazineSize = 1,
             damageFalloff =
@@ -140,7 +141,190 @@ object TestWeapons {
             usableZones = listOf(wildernessOrWarzoneOnly),
         )
 
+    // The team's Mural weapon-planning board (see docs/HANDOFF.md) named these; stats below are
+    // rough placeholders (the M1911's magazine size/heart-per-shot are the board's own numbers,
+    // everything else is a guess) -- a real balance pass will replace all of it, so no effort went
+    // into precise falloff/recoil/spread tuning here. "arasaka" (an SMG on the board) isn't
+    // implemented -- not a real WWI-era weapon name, needs the team to clarify what it actually is.
+    val m1911Round =
+        Ammo(
+            name = "m1911_round",
+            ammoType = AmmoType.PISTOL,
+            itemName = Component.text("M1911 Round"),
+        )
+
+    val m1911 =
+        Gun(
+            name = "m1911",
+            itemName = Component.text("Colt M1911"),
+            ammo = m1911Round,
+            magazineSize = 7,
+            damageFalloff = DamageFalloff(maxDamage = 2f, falloffStartRange = 20.0, falloffEndRange = 40.0, minDamage = 2f),
+            automatic = false,
+            cooldownMs = 400,
+            reloadMs = 1500,
+            recoilMin = 1f,
+            recoilMax = 2f,
+            spreadMin = 0.5f,
+            spreadMax = 1.5f,
+        )
+
+    val mauserC96Round =
+        Ammo(
+            name = "mauser_c96_round",
+            ammoType = AmmoType.PISTOL,
+            itemName = Component.text("Mauser C96 Round"),
+        )
+
+    val mauserC96 =
+        Gun(
+            name = "mauser_c96",
+            itemName = Component.text("Mauser C96"),
+            ammo = mauserC96Round,
+            magazineSize = 10,
+            damageFalloff = DamageFalloff(maxDamage = 2f, falloffStartRange = 20.0, falloffEndRange = 40.0, minDamage = 2f),
+            automatic = false,
+            cooldownMs = 400,
+            reloadMs = 1800,
+            recoilMin = 1f,
+            recoilMax = 2f,
+            spreadMin = 0.5f,
+            spreadMax = 1.5f,
+        )
+
+    val mp18Magazine =
+        Ammo(
+            name = "mp18_magazine",
+            ammoType = AmmoType.MACHINE_GUN,
+            itemName = Component.text("MP18 Magazine"),
+        )
+
+    val mp18 =
+        Gun(
+            name = "mp18",
+            itemName = Component.text("MP18"),
+            ammo = mp18Magazine,
+            magazineSize = 32,
+            damageFalloff = DamageFalloff(maxDamage = 1.5f, falloffStartRange = 10.0, falloffEndRange = 30.0, minDamage = 1f),
+            automatic = true,
+            cooldownMs = 150,
+            reloadMs = 2500,
+            recoilMin = 0.5f,
+            recoilMax = 1.5f,
+            spreadMin = 1f,
+            spreadMax = 4f,
+        )
+
+    val tommyGunMagazine =
+        Ammo(
+            name = "tommy_gun_magazine",
+            ammoType = AmmoType.MACHINE_GUN,
+            itemName = Component.text("Tommy Gun Magazine"),
+        )
+
+    val tommyGun =
+        Gun(
+            name = "tommy_gun",
+            itemName = Component.text("Tommy Gun"),
+            ammo = tommyGunMagazine,
+            magazineSize = 30,
+            damageFalloff = DamageFalloff(maxDamage = 1.5f, falloffStartRange = 10.0, falloffEndRange = 30.0, minDamage = 1f),
+            automatic = true,
+            cooldownMs = 120,
+            reloadMs = 2800,
+            recoilMin = 0.5f,
+            recoilMax = 1.5f,
+            spreadMin = 1f,
+            spreadMax = 4f,
+        )
+
+    val springfieldRound =
+        Ammo(
+            name = "springfield_round",
+            ammoType = AmmoType.RIFLE,
+            itemName = Component.text("Springfield Round"),
+        )
+
+    // Real Springfield/Kar98k model from the "WWI & WWII rifles" pack -- see resourcepack/CREDITS.md.
+    val springfield =
+        Gun(
+            name = "springfield",
+            itemName = Component.text("Springfield"),
+            itemModel = "morellia:springfield",
+            itemModelAiming = "morellia:springfield-aiming",
+            ammo = springfieldRound,
+            magazineSize = 5,
+            damageFalloff = DamageFalloff(maxDamage = 12f, falloffStartRange = 20.0, falloffEndRange = 80.0, minDamage = 4f),
+            automatic = false,
+            cooldownMs = 1200,
+            reloadMs = 2500,
+            recoilMin = 2f,
+            recoilMax = 4f,
+            spreadMin = 0.5f,
+            spreadMax = 2f,
+        )
+
+    val karabinerRound =
+        Ammo(
+            name = "karabiner_round",
+            ammoType = AmmoType.RIFLE,
+            itemName = Component.text("Karabiner Round"),
+        )
+
+    val karabiner =
+        Gun(
+            name = "karabiner",
+            itemName = Component.text("Karabiner"),
+            itemModel = "morellia:karabiner",
+            itemModelAiming = "morellia:karabiner-aiming",
+            ammo = karabinerRound,
+            magazineSize = 5,
+            damageFalloff = DamageFalloff(maxDamage = 12f, falloffStartRange = 20.0, falloffEndRange = 80.0, minDamage = 4f),
+            automatic = false,
+            cooldownMs = 1200,
+            reloadMs = 2500,
+            recoilMin = 2f,
+            recoilMax = 4f,
+            spreadMin = 0.5f,
+            spreadMax = 2f,
+        )
+
+    // Placeholder bayonet models stand in for these -- see resourcepack/CREDITS.md, the pack has no
+    // standalone trench-knife assets.
+    val usTrenchKnife =
+        Melee(
+            name = "us_trench_knife",
+            itemName = Component.text("US M1918 Mk1 Trench Knife"),
+            itemModel = "morellia:us_trench_knife",
+            damage = 6.0,
+            attackSpeed = 2.0,
+        )
+
+    val nahkampfmesser =
+        Melee(
+            name = "nahkampfmesser",
+            itemName = Component.text("Nahkampfmesser"),
+            itemModel = "morellia:nahkampfmesser",
+            damage = 6.0,
+            attackSpeed = 2.0,
+        )
+
+    val couteauPoignard =
+        Melee(
+            name = "couteau_poignard",
+            itemName = Component.text("Couteau Poignard Modele 1916"),
+            itemModel = "morellia:couteau_poignard",
+            damage = 6.0,
+            attackSpeed = 2.0,
+        )
+
     fun register() {
-        Item.registerItems(musketBall, musket, bayonet, artilleryShell, fieldGun, shotgunShell, shotgun)
+        Item.registerItems(
+            musketBall, musket, bayonet, artilleryShell, fieldGun, shotgunShell, shotgun,
+            m1911Round, m1911, mauserC96Round, mauserC96,
+            mp18Magazine, mp18, tommyGunMagazine, tommyGun,
+            springfieldRound, springfield, karabinerRound, karabiner,
+            usTrenchKnife, nahkampfmesser, couteauPoignard,
+        )
     }
 }

@@ -32,6 +32,36 @@ object DevLoadout {
                 TestWeapons.shotgun.setAmmo(TestWeapons.shotgun.toItemStack(), TestWeapons.shotgun.magazineSize),
             )
             inventory.setItemStack(6, TestWeapons.shotgunShell.toItemStack().withAmount(8))
+
+            // New from the team's Mural weapon-planning board -- see TestWeapons.kt. Placed past the
+            // hotbar (slots 9+) since the hotbar's already full; open the inventory to grab these.
+            inventory.setItemStack(7, TestWeapons.usTrenchKnife.toItemStack())
+            inventory.setItemStack(8, TestWeapons.nahkampfmesser.toItemStack())
+            inventory.setItemStack(9, TestWeapons.couteauPoignard.toItemStack())
+            inventory.setItemStack(10, TestWeapons.m1911.setAmmo(TestWeapons.m1911.toItemStack(), TestWeapons.m1911.magazineSize))
+            inventory.setItemStack(11, TestWeapons.m1911Round.toItemStack().withAmount(32))
+            inventory.setItemStack(
+                12,
+                TestWeapons.mauserC96.setAmmo(TestWeapons.mauserC96.toItemStack(), TestWeapons.mauserC96.magazineSize),
+            )
+            inventory.setItemStack(13, TestWeapons.mauserC96Round.toItemStack().withAmount(32))
+            inventory.setItemStack(14, TestWeapons.mp18.setAmmo(TestWeapons.mp18.toItemStack(), TestWeapons.mp18.magazineSize))
+            inventory.setItemStack(15, TestWeapons.mp18Magazine.toItemStack().withAmount(4))
+            inventory.setItemStack(
+                16,
+                TestWeapons.tommyGun.setAmmo(TestWeapons.tommyGun.toItemStack(), TestWeapons.tommyGun.magazineSize),
+            )
+            inventory.setItemStack(17, TestWeapons.tommyGunMagazine.toItemStack().withAmount(4))
+            inventory.setItemStack(
+                18,
+                TestWeapons.springfield.setAmmo(TestWeapons.springfield.toItemStack(), TestWeapons.springfield.magazineSize),
+            )
+            inventory.setItemStack(19, TestWeapons.springfieldRound.toItemStack().withAmount(20))
+            inventory.setItemStack(
+                20,
+                TestWeapons.karabiner.setAmmo(TestWeapons.karabiner.toItemStack(), TestWeapons.karabiner.magazineSize),
+            )
+            inventory.setItemStack(21, TestWeapons.karabinerRound.toItemStack().withAmount(20))
         }
     }
 }
