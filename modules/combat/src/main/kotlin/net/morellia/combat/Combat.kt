@@ -12,6 +12,7 @@ import net.morellia.combat.listeners.PlayerDisconnectListener
 import net.morellia.combat.listeners.ReloadListener
 import net.morellia.combat.listeners.WeaponSwapListener
 import net.morellia.combat.tasks.ActionBarManager
+import net.morellia.combat.tasks.ModelRefreshTask
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -45,6 +46,7 @@ object Combat {
         WeaponSwapListener.init()
         PlayerDisconnectListener.init()
         ActionBarManager.start()
+        ModelRefreshTask.start()
     }
 
     /** Drops every per-player entry -- called on disconnect so state maps don't grow unbounded. */

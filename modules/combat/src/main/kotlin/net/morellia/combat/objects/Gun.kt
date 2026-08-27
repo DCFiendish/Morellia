@@ -93,8 +93,20 @@ class Gun(
      * (a no-op otherwise -- guards against a listener firing after the player has already switched
      * weapons). Written to the physical ItemStack's component, not sent as a one-off packet, so the
      * variant persists correctly across hotbar switches for free. Called from every state
-     * transition that can change which variant applies: [fire] (ammo may hit 0), reload start/end
-     * (ReloadListener), and aim press/release (AimingListener).
+     * transition that can change which variant applies ([fire] as ammo may hit 0, reload start/end,
+     * aim press/release) as an immediate best-effort update, *and* unconditionally every tick from
+     * [net.morellia.combat.tasks.ModelRefreshTask] regardless of whether the target model actually
+     * changed since last tick.
+     *
+     * The per-tick resend is the actual fix for the "aiming pose never visually changes" bug (see
+     * docs/HANDOFF.md, root-caused 2026-08-27): a one-shot set on the aim-press edge alone gets
+     * silently lost client-side and the held item keeps rendering its old baked model/transform.
+     * Confirmed against `Aechronis/aechronis`'s own working `ModelManager.updateModel`
+     * (`modules/combat/.../tasks/ModelManager.kt`), which does the identical unconditional per-tick
+     * reassignment -- and whose `ak47`/`ak47-aiming` model pair also proved the swap needs no
+     * geometry divergence to render correctly (their two models' `elements` arrays are
+     * byte-identical, only `display` differs), ruling out the previously-suspected client-side
+     * mesh-dedup-by-geometry theory.
      */
     fun refreshModel(player: Player) {
         val stack = player.itemInMainHand
@@ -106,13 +118,7 @@ class Gun(
                 player in Combat.aimingPlayers -> itemModelAiming
                 else -> itemModel
             } ?: return
-        // TEMP DEBUG (2026-08-26 ADS investigation, see docs/HANDOFF.md) -- confirms this method
-        // really does resolve/apply the intended model string server-side; remove once the aiming
-        // display-transform render bug below is actually root-caused and fixed.
-        println("[DEBUG refreshModel] player=${player.username} aiming=${player in Combat.aimingPlayers} currentComponent=${stack.get(DataComponents.ITEM_MODEL)} targetModel=$model")
-        if (stack.get(DataComponents.ITEM_MODEL) != model) {
-            player.itemInMainHand = stack.with(DataComponents.ITEM_MODEL, model)
-        }
+        player.itemInMainHand = stack.with(DataComponents.ITEM_MODEL, model)
     }
 
     /**

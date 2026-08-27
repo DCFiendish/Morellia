@@ -333,6 +333,50 @@ Other resourcepack-side findings from this investigation, still true regardless 
   its own — zeroing it out produced no visible change either (before the dedup issue was even
   suspected), so that specific fix attempt is a dead end, not something to re-try.
 
+## Status update (2026-08-27): ADS render bug root-caused and fixed, all three rifles centered
+
+The "aiming pose never visually changes" bug from the entry above is **resolved**. The
+mesh-dedup-by-geometry theory was wrong — root cause and fix:
+
+- **Checked `Aechronis/aechronis`'s real, working `ak47`/`ak47-aiming` pair directly** (same
+  `net.minestom:minestom:2026.07.12-26.2` pin Morellia uses). Their two models' `elements` arrays
+  are **byte-identical** — only `display` differs. So geometry divergence was never required, and a
+  same-tick diagnostic swap to `us_trench_knife`'s geometry (which *did* render, just tiny/wrong-
+  scaled) was a red herring, not confirmation of the dedup theory.
+- **The real difference**: Aechronis's `ModelManager.updateModel` (`modules/combat/.../tasks/
+  ModelManager.kt`) reassigns the held item's model **unconditionally, every tick**, for every
+  online player — not once on a state-transition edge the way Morellia's `AimingListener` did. A
+  one-shot set on the aim-press edge was getting silently lost/stale client-side; continuous
+  resend is what makes it actually stick.
+- **Fix**: [Gun.kt](../modules/combat/src/main/kotlin/net/morellia/combat/objects/Gun.kt)'s
+  `refreshModel` now writes the model component unconditionally (dropped the "only if changed"
+  guard and the temp debug println from the entry above). New
+  [ModelRefreshTask.kt](../modules/combat/src/main/kotlin/net/morellia/combat/tasks/ModelRefreshTask.kt)
+  is a 1-tick repeating task (mirrors the existing `ActionBarManager` pattern) that calls
+  `refreshModel` for every online player holding a `Gun`, wired into `Combat.initialize()`. This
+  is gun-agnostic — it fixes ADS rendering for every current and future `Gun`, not just the musket.
+- **Confirmed working in-game** by the user after the fix, then the `firstperson_righthand`/
+  `firstperson_lefthand` `translation` in `musket-aiming.json` was hand-tuned live (restart →
+  reconnect → eyeball → repeat, since Blockbench's own MCP live-preview server
+  (`localhost:3000/bb-mcp`) wasn't wired into the session that did this work — MCP connections are
+  established at session start, so opening Blockbench mid-session doesn't help; use it from a fresh
+  session next time for faster iteration) until centered: `x` went from the previous session's guess
+  of `0` through `-6`, `-9`, `-7.5`, `-7.8`, `-8.2`, landing on **`-8.05`** (confirmed centered).
+  `firstperson_lefthand.x` was kept at `firstperson_righthand.x - 1.5` throughout, matching the
+  original file's own established delta — lefthand isn't the primary rendered view for a
+  right-handed player so it was never independently tuned.
+- **Ported the same centering to `springfield-aiming.json`/`karabiner-aiming.json`**, which hadn't
+  been touched yet. Not independently tuned in-game (not asked for) — estimated from the musket's
+  confirmed ratio (`aim_x ≈ hip_x × -0.976`, i.e. musket's hip `firstperson_righthand.x` of `8.25`
+  landing on aim `-8.05`) applied to each rifle's own hip `x` (Springfield `6.75` → `-6.59`,
+  Karabiner `7.75` → `-7.56`), same `-1.5` lefthand delta convention. Same source pack, similar
+  bolt-action proportions, so this is a reasonable starting point but **not confirmed by eye** —
+  worth a quick in-game check next session before considering those two fully done.
+- `resourcepack.zip` rebuilt (`jar cf`, from `resourcepack/`) and the local dev server restarted
+  after every content change — necessary because `ResourcePack.kt` hashes the zip once at boot;
+  editing the zip without restarting leaves the server serving a stale hash and the client never
+  redownloads.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically
@@ -474,8 +518,12 @@ Pterodactyl server UUID, volume path, and container ownership details are in
 
 ## What's genuinely still open (not urgent, not touched recently)
 
-- **New, 2026-08-26, actually next up**: the ADS "peering down the barrel" aiming-pose render bug —
-  see the status update above for the full investigation. Pick up at "Next things to try" there.
+- **Resolved 2026-08-27**: the ADS "peering down the barrel" aiming-pose render bug — root-caused
+  (one-shot edge-triggered model set vs. required per-tick resend) and fixed, all three rifles
+  centered. See that status update above. Remaining, not urgent: Springfield/Karabiner's centering
+  was estimated from the musket's ratio, not independently eyeballed — worth a quick in-game check
+  next session. Also worth setting up Blockbench's MCP connection at the *start* of a session next
+  time asset-tuning work like this comes up (live preview, no restart-and-eyeball loop needed).
 - **New, 2026-08-25/26, actually next up**: Morellia's own `server/build.gradle.kts` pins are stale
   against what's now on `nodes`/`vanilla` master (`40b2270`/`a074e09` vs. the current `6f1f9dd`/
   `96b593f`) — see the nodes/vanilla status update above for the exact bump + follow-up work.
