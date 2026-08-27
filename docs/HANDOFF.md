@@ -357,25 +357,67 @@ mesh-dedup-by-geometry theory was wrong — root cause and fix:
   is gun-agnostic — it fixes ADS rendering for every current and future `Gun`, not just the musket.
 - **Confirmed working in-game** by the user after the fix, then the `firstperson_righthand`/
   `firstperson_lefthand` `translation` in `musket-aiming.json` was hand-tuned live (restart →
-  reconnect → eyeball → repeat, since Blockbench's own MCP live-preview server
-  (`localhost:3000/bb-mcp`) wasn't wired into the session that did this work — MCP connections are
-  established at session start, so opening Blockbench mid-session doesn't help; use it from a fresh
-  session next time for faster iteration) until centered: `x` went from the previous session's guess
-  of `0` through `-6`, `-9`, `-7.5`, `-7.8`, `-8.2`, landing on **`-8.05`** (confirmed centered).
+  reconnect → eyeball → repeat) until centered: `x` went from the previous session's guess of `0`
+  through `-6`, `-9`, `-7.5`, `-7.8`, `-8.2`, landing on **`-8.05`** (confirmed centered).
   `firstperson_lefthand.x` was kept at `firstperson_righthand.x - 1.5` throughout, matching the
   original file's own established delta — lefthand isn't the primary rendered view for a
-  right-handed player so it was never independently tuned.
-- **Ported the same centering to `springfield-aiming.json`/`karabiner-aiming.json`**, which hadn't
-  been touched yet. Not independently tuned in-game (not asked for) — estimated from the musket's
-  confirmed ratio (`aim_x ≈ hip_x × -0.976`, i.e. musket's hip `firstperson_righthand.x` of `8.25`
-  landing on aim `-8.05`) applied to each rifle's own hip `x` (Springfield `6.75` → `-6.59`,
-  Karabiner `7.75` → `-7.56`), same `-1.5` lefthand delta convention. Same source pack, similar
-  bolt-action proportions, so this is a reasonable starting point but **not confirmed by eye** —
-  worth a quick in-game check next session before considering those two fully done.
+  right-handed player so it was never independently tuned. **Musket ADS is fully done.**
+- **Ported the same centering ratio to `springfield-aiming.json`/`karabiner-aiming.json`** as a
+  starting estimate (`aim_x ≈ hip_x × -0.976`, i.e. musket's hip `firstperson_righthand.x` of `8.25`
+  landing on aim `-8.05`, applied to each rifle's own hip `x`) — see the next status update for what
+  happened when these were actually checked in-game.
 - `resourcepack.zip` rebuilt (`jar cf`, from `resourcepack/`) and the local dev server restarted
   after every content change — necessary because `ResourcePack.kt` hashes the zip once at boot;
   editing the zip without restarting leaves the server serving a stale hash and the client never
   redownloads.
+
+## Status update (2026-08-27, continued): Springfield/Karabiner in progress, Blockbench MCP notes
+
+Direct continuation of the entry above, same day.
+
+- **Springfield's estimated `-6.59` was wrong** — checked in-game, still visibly right of center.
+  Rather than continue the restart-loop, **the user hand-tuned `springfield-aiming.json` directly in
+  Blockbench's own UI** (not via MCP — see below) and saved it. Current on-disk value:
+  `firstperson_righthand.translation` **`[-8.09, 3, -6]`**, `firstperson_lefthand.translation`
+  **`[-8.09, 4.5, -3]`** (both hands the same `x` this time, not the `-1.5` delta convention used for
+  the other two rifles — that's an intentional live edit, not a mistake, leave as-is). **Not yet
+  confirmed centered in-game after this edit** — the resource pack was rebuilt and the server
+  restarted to serve it (so it's ready to test), but no in-game check happened before this was
+  written down. Check this first next session.
+- **Karabiner is untouched since the initial estimate** (`-7.56`, from the same ratio that turned
+  out wrong for Springfield) — genuinely unconfirmed, hasn't been looked at in-game at all yet.
+- **Blockbench MCP plugin correction**: the earlier claim above ("MCP connections are established at
+  session start, opening Blockbench mid-session doesn't help") turned out to be **incomplete, not
+  fully wrong**. Mid-session, the user's `blockbench-mcp-plugin` (jasonjgardner, v1.6.1, installed in
+  Blockbench via Plugins → Load from URL →
+  `https://jasonjgardner.github.io/blockbench-mcp-plugin/mcp.js`, config: port `3000`, endpoint
+  `/bb-mcp`, matches `http://localhost:3000/bb-mcp` in `.claude.json`) had its tool schemas briefly
+  become visible to this session's `ToolSearch` (~90 tools: `place_cube`, `capture_screenshot`,
+  `modify_cube`, etc.) — the same pattern as `docker`/`minestom` connecting mid-session earlier that
+  day, proving mid-session MCP attach genuinely can happen. But every actual tool call
+  (`get_project_info`) still failed with `"MCP server \"blockbench\" is not connected"`, even after
+  confirming via `curl localhost:3000/bb-mcp` that the plugin's HTTP endpoint is alive and reachable.
+  So the server side is fine; this specific session's MCP client never completed a real handshake,
+  for reasons not root-caused (a stale schema cache from an earlier connection attempt is one
+  plausible explanation, not confirmed). **Unresolved**: whether a fresh session reliably picks this
+  up, or whether `/mcp` (an interactive terminal command Claude can't invoke itself, but the user
+  can) would reconnect it mid-session without a full restart — neither was actually tried by end of
+  session. Try `/mcp` first next time before assuming a restart is required.
+- **If/when Blockbench MCP does connect**: it exposes real render feedback (`capture_screenshot`,
+  `capture_app_screenshot`), not just blind coordinate edits — worth using it for any future
+  display-transform tuning or model editing instead of the restart-and-eyeball loop this session
+  relied on for the musket (six rounds of guess-and-check to converge on `-8.05`, and the same
+  ratio-based estimate still ended up wrong for Springfield). Discussed but not attempted: whether
+  Claude would be better at *editing* an already-decent existing model (small, bounded value/vertex
+  nudges) than the from-scratch cube-by-cube model creation the user tried earlier and found
+  "incredibly terrible" — the real determining factor either way is whether the tool call loop
+  actually includes a screenshot/render Claude can see, not create-vs-edit per se.
+- **Local dev environment, still running as of end of session** (all separate OS processes, survive
+  regardless of Claude Code session state): the Morellia server (`:server:run`, restarted several
+  times this session, currently serving the resource pack with Springfield's Blockbench-edited
+  value), `jwebserver -p 8000` from `server/` serving `resourcepack.zip`, and a Fabric dev client
+  (`morellia-testclient`, username `devtest`) connected to `localhost:25567`. Blockbench itself is
+  also open, with its MCP plugin enabled and listening on port 3000.
 
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
@@ -518,12 +560,13 @@ Pterodactyl server UUID, volume path, and container ownership details are in
 
 ## What's genuinely still open (not urgent, not touched recently)
 
-- **Resolved 2026-08-27**: the ADS "peering down the barrel" aiming-pose render bug — root-caused
-  (one-shot edge-triggered model set vs. required per-tick resend) and fixed, all three rifles
-  centered. See that status update above. Remaining, not urgent: Springfield/Karabiner's centering
-  was estimated from the musket's ratio, not independently eyeballed — worth a quick in-game check
-  next session. Also worth setting up Blockbench's MCP connection at the *start* of a session next
-  time asset-tuning work like this comes up (live preview, no restart-and-eyeball loop needed).
+- **Resolved 2026-08-27, but NOT fully done**: the ADS render bug itself (per-tick resend) is fixed
+  and confirmed for good, musket centering is confirmed done. **Still open, pick up here next**:
+  Springfield was hand-edited in Blockbench to `x=-8.09` but never actually checked in-game after
+  that edit; Karabiner still has its original (Springfield-disproved) ratio estimate and hasn't been
+  looked at in-game at all. See the "continued" status update above for exact values and the
+  Blockbench MCP connection situation (installed, server reachable, but this session's tool calls
+  never actually connected — try `/mcp` before assuming a fresh session is required).
 - **New, 2026-08-25/26, actually next up**: Morellia's own `server/build.gradle.kts` pins are stale
   against what's now on `nodes`/`vanilla` master (`40b2270`/`a074e09` vs. the current `6f1f9dd`/
   `96b593f`) — see the nodes/vanilla status update above for the exact bump + follow-up work.
