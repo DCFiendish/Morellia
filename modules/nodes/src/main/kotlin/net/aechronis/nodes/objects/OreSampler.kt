@@ -19,11 +19,11 @@
  * https://www.keithschwarz.com/interesting/code/?dir=alias-method
  *
  * To allow different ore patterns at different y-height levels, map each
- * possible y in game height [0, 255] to an ore probability table
- *    0  -> Probability Table
- *    1  -> Probability Table
+ * possible y in game height [-64, 320] (standard modern Overworld bounds) to an ore probability table
+ *   -64  -> Probability Table
+ *   -63  -> Probability Table
  *   ...
- *   255 -> Probability Table
+ *   320  -> Probability Table
  */
 
 package net.aechronis.nodes.objects
@@ -33,9 +33,9 @@ import java.util.ArrayDeque
 import java.util.Deque
 import java.util.concurrent.ThreadLocalRandom
 
-// game heights constants
-const val Y_WORLD_MIN = 0
-const val Y_WORLD_MAX = 255
+// game heights constants -- matches Minestom's DimensionType.OVERWORLD (-64..320)
+const val Y_WORLD_MIN = -64
+const val Y_WORLD_MAX = 320
 
 // random number generator
 private val random = ThreadLocalRandom.current()
@@ -154,16 +154,17 @@ class OreSampler(
     ores: ArrayList<OreDeposit>,
 ) {
     // array maps each y height level -> OreTable
-    // array is thus always 256 sized pointers to OreTable
-    private val itemsAtHeight: Array<ItemDistribution?> = arrayOfNulls(256)
+    // array is thus always (Y_WORLD_MAX - Y_WORLD_MIN + 1) sized pointers to OreTable, indexed by
+    // (y - Y_WORLD_MIN) since Kotlin arrays can't take negative indices directly
+    private val itemsAtHeight: Array<ItemDistribution?> = arrayOfNulls(Y_WORLD_MAX - Y_WORLD_MIN + 1)
 
     init {
         // 1. iterate ores and generate array of y-intervals and their ore deposits
-        var yStart = 0
+        var yStart = Y_WORLD_MIN
         var yEnd: Int = Y_WORLD_MAX
-        // Was `yStart < Y_WORLD_MAX` -- once yStart reached the top level (255) the loop exited
-        // without ever building an interval for it, so itemsAtHeight[255] stayed null and ore
-        // never sampled at the single topmost configured Y-level.
+        // Was `yStart < Y_WORLD_MAX` -- once yStart reached the top level the loop exited without
+        // ever building an interval for it, so itemsAtHeight[Y_WORLD_MAX] stayed null and ore never
+        // sampled at the single topmost configured Y-level.
         while (yStart <= Y_WORLD_MAX) {
 
             // find closest interval edge
@@ -188,7 +189,7 @@ class OreSampler(
 
             val items = ItemDistribution(validOres)
             for (i in yStart..yEnd) {
-                this.itemsAtHeight[i] = items
+                this.itemsAtHeight[i - Y_WORLD_MIN] = items
             }
 
             // move interval up
@@ -199,9 +200,9 @@ class OreSampler(
 
     // sample ore deposits distribution at given height
     fun sample(y: Int): List<ItemStack> {
-        // ensure y in [0, 255]
+        // ensure y in [Y_WORLD_MIN, Y_WORLD_MAX]
         if (y >= Y_WORLD_MIN && y <= Y_WORLD_MAX) {
-            val sampler = this.itemsAtHeight[y]
+            val sampler = this.itemsAtHeight[y - Y_WORLD_MIN]
             if (sampler !== null) {
                 return sampler.sample()
             }

@@ -14,8 +14,8 @@ data class OreDeposit(
     val dropChance: Double,
     val minAmount: Int,
     val maxAmount: Int,
-    val ymin: Int = 0,
-    val ymax: Int = 255,
+    val ymin: Int = Y_WORLD_MIN,
+    val ymax: Int = Y_WORLD_MAX,
 ) {
     // return new ore deposit from merging two
     // merge rules:

@@ -510,6 +510,57 @@ undated content preserved faithfully:
   blank Blockbench "New Project" saves that got written to disk. Safe to ignore or delete; keeping
   them for now since deleting someone else's file without being asked isn't this session's call.
 
+## Status update (2026-08-29): real-terrain map generation restarted, scripted WorldPainter pipeline
+
+Direct continuation of the "real terrain needs replanning from scratch" item flagged in the
+2026-08-25 status update above. Full details, exact commands, and the complete open-items list
+live in **`tools/agadir-mapgen/README.md`** — this entry is a summary, not a repeat.
+
+- **New approach: WorldPainter's `wpscript` scripting host**, not a hand-rolled generator (both
+  prior attempts, above, were hand-rolled and both failed/were abandoned) and not the GUI
+  either — every step is a committed, reproducible script. Real elevation source is SRTM15+ (a
+  single-request global DEM, ~450m/px, near-exact match for the approved 1:750 scale), covering
+  the same trimmed box as the original abandoned attempt (Britain through Morocco).
+- **Real, non-hypothetical bug found and fixed twice over**: WorldPainter's 26.1 export writes
+  the invalid legacy block name `minecraft:grass` (real Minecraft renamed it to
+  `minecraft:short_grass` around 1.20.5; Minestom 26.2's registry has no entry for the old name)
+  for its own default grass-vegetation feature, on *every* export. This is almost certainly what
+  actually killed the original `AgadirWorld.kt` attempt too, not a stale source-map theory.
+  `tools/agadir-mapgen/patch_grass_names.py` fixes it post-export; must be re-run after every
+  regeneration.
+- **`modules/nodes/.../OreSampler.kt` and `OreDeposit.kt` fixed** for real modern world height
+  (-64..320, matching Minestom's `DimensionType.OVERWORLD` — the user explicitly wants real
+  deepslate-to-surface layering, not a simplified legacy 0-255 range). Was hardcoded to legacy
+  0-255, a flat array indexed directly by `y` with no offset math, silently broken
+  (index-out-of-bounds or dead below y=0) against real modern height. Fixed and confirmed
+  compiling clean.
+- **`AgadirWorld.kt` recreated** pointing at `morellia-data/world` (gitignored, ~230MB, not
+  committed — regenerate via `tools/agadir-mapgen/` if missing). `Main.kt`'s spawn point is the
+  real box's true center (confirmed by scanning exported `.mca` chunk headers directly — the
+  box is **not** centered on the origin), not (0,0).
+- **Verified working end-to-end**: booted locally, connected via the `morellia-testclient`
+  Fabric dev client, confirmed real varying elevation (not the flat-stone fallback) at multiple
+  points, confirmed clean boot with zero "Unknown block" errors after the grass-name patch.
+- **User feedback mid-session, not yet acted on**: raw/unsmoothed terrain looked rough (fixed —
+  Gaussian smoothing added to the heightmap conversion step); trees/ground/foliage all still
+  look bad as of this commit — root-caused to `TreeLayer`'s density being a NIBBLE (0-15) value,
+  not binary, and a fix (`agadir-import-v2.js`) is written but **not yet run/verified**. The
+  user also wants a scripted way to place the big custom TreeForge tree schematics already
+  downloaded (`tools/agadir-mapgen/treeforge-trees/`, 16 `.schem` files) instead of relying on
+  WorldPainter's plain built-in tree exporter — not yet implemented, real open question about
+  whether `wpscript`'s API supports painting custom objects the way it paints built-in layers.
+- **Explicitly still open, see the README for the full prioritized list**: run+verify
+  `agadir-import-v2.js`; a real custom-tree painting script; latitude-only biome zoning can't
+  distinguish Morocco from Southern Spain (needs real country-boundary geodata); rivers
+  (deferred from the start); border/territory painting is a fully separate, unstarted task with
+  its own already-documented schema (see the "Borders" section below — historical/abandoned,
+  but the `nodes` `world.json`/`towns.json` schema itself is unchanged and still accurate).
+- **Unresolved user question**: whether continuing to have Claude script every visual-polish
+  decision (texture, tree density, biome zoning) via blind elevation-threshold heuristics is
+  actually the right approach, versus using WorldPainter's GUI directly now that real data is
+  correctly imported at the right scale/position/version. User was pointed at this tradeoff
+  explicitly; hasn't chosen a direction as of this commit.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically

@@ -10,20 +10,23 @@ import net.minestom.server.coordinate.Pos
 import net.morellia.combat.Combat
 
 fun main() {
-    // Plain stone superflat everywhere (StoneFlatTerrain.generator, surface at y=64). Every
-    // real-world terrain source this project tried (AgadirWorld's AnvilLoader over a trimmed
-    // Anvil download, EuropeTerrain's procedural NOAA/WWF-heightmap generator) has been dropped --
-    // see docs/HANDOFF.md. Flat stone is the deliberate baseline while terrain gets replanned, not a
-    // fallback for a broken loader.
-    // Sits north of both LoadTestBots test towns' territories (chunks x:0-5, z:0-2), on the
-    // flat stone surface (y=64 top, so y=65 stands directly on it).
-    val spawnPoint = Pos(48.5, 65.0, -20.5)
+    // Real terrain test boot: WorldPainter-authored Agadir Crisis map (see AgadirWorld.kt and
+    // docs/HANDOFF.md). StoneFlatTerrain.generator still covers any chunk outside the imported
+    // box so the world never has unrendered holes. The imported world isn't centered on the
+    // origin -- it occupies exactly block X:[0,3583] Z:[0,3711] (confirmed by scanning the
+    // exported .mca region files' chunk headers directly, not just which region files exist --
+    // the naive region-file-count estimate overshot Z by ~384 blocks since the last region row
+    // is only partially populated) -- so spawn is the box's true center, not (0,0). High above
+    // y=210 (our authored ceiling) so the player free-falls onto real terrain; not yet tuned to
+    // a specific real-world landmark.
+    val spawnPoint = Pos(1791.5, 250.0, 1855.5)
     val instance = createTestServer(
         generator = StoneFlatTerrain.generator,
         spawnPoint = spawnPoint,
         auth = Auth.Offline(),
         port = 25567,
     )
+    AgadirWorld.attach(instance)
     instance.setChunkSupplier(::FullbrightChunk)
     Vanilla.init(VanillaConfig(path = "morellia-data/vanilla"))
     // Testing-only: cut capture time way down so siege tests don't take forever. Both test
