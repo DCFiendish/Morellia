@@ -109,26 +109,29 @@ var deciduousLayer = wp.getLayer().withName('Deciduous').go();
 var pineLayer = wp.getLayer().withName('Pine').go();
 
 // Full deciduous forest on temperate lowland (Grass)
+var grassTerrainFilter = wp.createFilter().onlyOnTerrain(0).go();
 wp.applyHeightMap(heightMap)
     .toWorld(world)
-    .withFilter(wp.createFilter().onlyOnTerrain(0).go())
+    .withFilter(grassTerrainFilter)
     .applyToLayer(deciduousLayer)
     .fromLevels(0, 65535).toLevel(12)
     .go();
 
 // Sparse deciduous on Mediterranean lowland (Bare Grass) -- real Mediterranean vegetation is
 // much less densely forested than temperate Europe, not zero.
+var bareGrassTerrainFilter = wp.createFilter().onlyOnTerrain(1).go();
 wp.applyHeightMap(heightMap)
     .toWorld(world)
-    .withFilter(wp.createFilter().onlyOnTerrain(1).go())
+    .withFilter(bareGrassTerrainFilter)
     .applyToLayer(deciduousLayer)
     .fromLevels(0, 65535).toLevel(3)
     .go();
 
 // Dense pine on the highland band (Coarse Dirt terrain, 800-1800m)
+var highlandTerrainFilter = wp.createFilter().onlyOnTerrain(3).go();
 wp.applyHeightMap(heightMap)
     .toWorld(world)
-    .withFilter(wp.createFilter().onlyOnTerrain(3).go())
+    .withFilter(highlandTerrainFilter)
     .applyToLayer(pineLayer)
     .fromLevels(0, 65535).toLevel(12)
     .go();

@@ -11,23 +11,22 @@ import java.nio.file.Path
  * was constructed with -- pass [StoneFlatTerrain.generator] for that.
  */
 object AgadirWorld {
-    // TEMP: pointing directly at the scratchpad export for the first boot test. Move under
-    // morellia-data/world (matching the old convention) once this is confirmed working.
-    // WorldPainter 2.27's Minecraft-26.1-format export uses the newer per-dimension layout
-    // (region/ lives under dimensions/minecraft/overworld/, not at the world root) -- Minestom's
-    // AnvilLoader wants a folder that directly contains region/, so point one level deeper than
-    // the actual world root.
-    // Smoothed + vegetated pass: real SRTM15+ elevation (smoothed), WorldPainter forest layers
-    // (Deciduous below 800m, Pine 800-1800m, elevation as a climate proxy) and Grass terrain's
-    // own default flower/tall-grass population. Verified all 64 distinct block names in the
-    // export are valid modern IDs (no other stale legacy names beyond the grass fix, which is
-    // reapplied on every WorldPainter export -- see tools/agadir-mapgen/README.md).
+    // morellia-data/world is a full Minecraft world save folder (level.dat, data/, dimensions/,
+    // session.lock) -- the export root produced by tools/agadir-mapgen/, copied in as-is.
+    // Minestom's AnvilLoader(Path) resolves level.dat and dimensions/<namespace>/<value>/region
+    // itself (confirmed by disassembling AnvilLoader.class), so PATH must be the world root, NOT
+    // pre-flattened to the inner dimensions/minecraft/overworld folder -- an earlier version of
+    // this comment (and of tools/agadir-mapgen/README.md's step 5) assumed the opposite and was
+    // wrong; both are fixed now.
     //
     // Regenerate via tools/agadir-mapgen/ if this directory is ever missing (morellia-data/ is
-    // gitignored -- this ~230MB world is not committed). world/ itself is the *dimension* root
-    // Minestom's AnvilLoader expects (contains region/ directly), one level inside WorldPainter's
-    // actual world export -- see the mapgen README for why.
-    const val PATH = "morellia-data/world"
+    // gitignored -- this ~230MB+ world is not committed).
+    //
+    // MORELLIA_WORLD_PATH overrides this for fast iteration against a small test map (see
+    // tools/agadir-mapgen/agadir-import-test.js) without touching the real world or needing a
+    // separate Main-like entry point -- e.g.
+    // MORELLIA_WORLD_PATH=morellia-data/test-world ./gradlew.bat :server:run
+    val PATH: String = System.getenv("MORELLIA_WORLD_PATH") ?: "morellia-data/world"
 
     fun attach(instance: InstanceContainer) {
         instance.setChunkLoader(AnvilLoader(Path.of(PATH)))
