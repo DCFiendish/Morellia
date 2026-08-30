@@ -419,6 +419,97 @@ Direct continuation of the entry above, same day.
   (`morellia-testclient`, username `devtest`) connected to `localhost:25567`. Blockbench itself is
   also open, with its MCP plugin enabled and listening on port 3000.
 
+## Status update (2026-08-29): WW1 weapon asset-sourcing research, no model work done yet
+
+Pure research session, separate machine/chat from the Blockbench editing above — no in-game
+testing happened. Also swept up and committed two pre-existing uncommitted changes found sitting
+in the working tree from the 2026-08-27 Blockbench session (see the entry directly below this
+one for what those actually are).
+
+**Goal**: find higher-quality WW1 rifle models than the memava MIT pack currently in
+`resourcepack/` (musket/Springfield/Karabiner) — user explicitly said memava's models "weren't
+good enough."
+
+**License landscape mapped, most options ruled out**:
+- ZachoPixel's "World War I Texture Pack" (CurseForge/Modrinth) and `Fields of 1918` (90+ weapons,
+  Battlefield-1-inspired, highest visual quality found) — both **ARR**, no stated server-use
+  permission. Excluded.
+- TACZ WW1/Great War gunpacks — high quality but **wrong format even if licensing were fine**:
+  TACZ renders through its own mesh/GeckoLib pipeline requiring the TACZ Forge/Fabric mod
+  client-side. Morellia serves plain vanilla protocol (Minestom, no mod loader), so players
+  couldn't load these regardless of license.
+- `github.com/Ligua999/Minecraft-Open-Weapons` (billed as free CC0 weapon models) — checked
+  directly via GitHub API, repo contains **only a LICENSE file, no actual models**. Dead end.
+- `ModularWarfare` (GitHub, open source) — also a Forge-mod-dependent format, same client-loader
+  problem as TACZ.
+
+**Confirmed usable (free + explicit permissive license + no mod dependency)**:
+- [WWI & WWII Rifles](https://modrinth.com/resourcepack/rifles) (Modrinth, MIT) — 22 rifles
+  including Kar98k/Mosin Nagant/Springfield 1903/Gewehr 98/two Lee-Enfields, vanilla item-model
+  format. **User already rejected this on quality before this session started.**
+
+**New direction found — real mesh geometry via `obj³` (objcubed), not cuboid tracing**:
+[github.com/JagerMeistars/obj-cubed](https://github.com/JagerMeistars/obj-cubed), MIT licensed,
+forked from Godlander's original `objmc`. Bakes actual OBJ/glTF mesh geometry (not Blockbench
+cuboids) into a PNG texture; bundled core shaders decode it client-side at render time. **No mod
+required — pure resource pack**, which is why it's viable for Morellia specifically. Requires
+Blockbench 4.8.0+ desktop (Node.js, for its custom PNG encoder) and is GUI-only — confirmed via
+its `package.json` that there is no standalone CLI, so this cannot be automated headlessly; it
+needs a human driving the Blockbench UI. Shaders are version-tuned for MC 26.1.2–26.2, which
+matches Morellia's actual target (see the pack.mcmeta note above) — not a blocker after all.
+
+**Mesh source picked**: [Low-Poly Kar98K by TastyTony](https://sketchfab.com/3d-models/low-poly-kar98k-d0ffca9b52864541ae5adbafb8d14064)
+— **CC-BY 4.0** (attribution required, commercial/redistribution use allowed), 3.5k triangles/1.9k
+vertices, well under obj³'s ~50K-face-per-chunk-section crash threshold. Two backup candidates if
+the Kar98K doesn't work out, both also confirmed-licensed: [Lee-Enfield MKIII](https://sketchfab.com/3d-models/lee-enfield-mkiii-f6a2160daf134071a84e3cae5f831875)
+(CC-BY 4.0) and [Springfield M1903](https://sketchfab.com/3d-models/springfield-m1903-rifle-224bd15dc9c544afa78af6c3a46fe22f)
+(**CC-BY-SA 4.0** — note share-alike: that specific baked asset should stay redistributable under
+the same terms if ever shared standalone, unlike the rest of this all-rights-reserved repo).
+
+**Actual progress made — genuinely minimal**: Sketchfab doesn't offer a raw `.obj` download for
+the Kar98K (only `.blend`/`.usdz`/`.gltf`/`.glb`); settled on downloading the **`.glb`** and using
+Blockbench's official "glTF Importer" marketplace plugin (imports as a Generic Model, meshes/
+textures/groups supported, armatures not — irrelevant for a static rifle). **User has only gotten
+as far as exporting/downloading the `.glb` from Sketchfab.** Nothing has been imported into
+Blockbench yet, the `objcubed.js` plugin hasn't been loaded, and no obj³ export has been attempted.
+
+**Exact next steps for whoever picks this up**:
+1. Load `objcubed.js` into Blockbench (File → Plugins → Load Plugin from File) — download from
+   `raw.githubusercontent.com/JagerMeistars/obj-cubed/main/objcubed.js`.
+2. Install the "glTF Importer" plugin from Blockbench's own marketplace.
+3. New project → Generic Model → File → Import → Import glTF Model → the downloaded Kar98K `.glb`.
+4. Position per obj³'s conventions: grid floor (y=0) = block bottom, model centered on origin in
+   X/Z, export from the Edit tab (not Display/Animate).
+5. File → Export → Export as obj³. Set a custom-model-data name matching the existing
+   springfield/karabiner naming convention (e.g. `karabiner`, since this is meant to replace/
+   upgrade the placeholder Karabiner rather than the already-real Springfield). **Export to a
+   scratch folder first**, not directly into `resourcepack/` — it writes/modifies
+   `assets/objcubed/`, `assets/minecraft/items/*.json`, `assets/minecraft/atlases/blocks.json`, and
+   `assets/minecraft/shaders/core/*`, and that diff needs review against the existing pack
+   structure (particularly whether it clobbers the existing item-override entries documented in
+   the 2026-08-26 "musket has a real model" status update above) before merging for real.
+6. Test standalone in the `morellia-testclient` dev client before merging into `resourcepack/`.
+7. Add a `resourcepack/CREDITS.md` entry for the Kar98K (TastyTony, CC-BY 4.0) per the existing
+   per-asset credit policy — same pattern as the existing memava MIT-pack entries.
+
+## Status update (2026-08-27, uncommitted work found and committed 2026-08-29): Springfield widened, two blank Blockbench scaffolds
+
+Found sitting uncommitted in the working tree at the start of the 2026-08-29 research session
+above — from the 2026-08-27 Blockbench session, never committed at the time. Committed as-is,
+undated content preserved faithfully:
+
+- **`springfield.json` elements widened**: every element's X-axis span roughly doubled outward
+  from center (e.g. the barrel's `from`/`to` X went `[6.6, 7.3]` → `[5.83, 8.07]`), plus a
+  `"format_version": "1.21.11"` field added at the top level (this is Blockbench's own internal
+  schema-version stamp, unrelated to the actual Minecraft version — see the note earlier in this
+  doc about pack.mcmeta's real 26.2 target). **Not verified in-game** — unknown whether this was a
+  deliberate width-correction or an accidental side effect of some other Blockbench operation.
+  Check this visually in the dev client before assuming it's correct.
+- **`springfield-clean.bbmodel` and `springfield-final.bbmodel` are both empty scaffold saves**
+  (`"elements":[]`, `"groups":[]`, `"textures":[]`, 420 bytes each) — not real model work, just
+  blank Blockbench "New Project" saves that got written to disk. Safe to ignore or delete; keeping
+  them for now since deleting someone else's file without being asked isn't this session's call.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically
@@ -560,6 +651,10 @@ Pterodactyl server UUID, volume path, and container ownership details are in
 
 ## What's genuinely still open (not urgent, not touched recently)
 
+- **New, 2026-08-29, actually next up for asset work**: pick up the obj³/Kar98K mesh-baking
+  pipeline exactly where the 2026-08-29 status update above left it — nothing has been imported
+  into Blockbench yet, only the `.glb` is downloaded. Also verify in-game whether `springfield.json`'s
+  2026-08-27 width-doubling edit (see the entry above) was intentional.
 - **Resolved 2026-08-27, but NOT fully done**: the ADS render bug itself (per-tick resend) is fixed
   and confirmed for good, musket centering is confirmed done. **Still open, pick up here next**:
   Springfield was hand-edited in Blockbench to `x=-8.09` but never actually checked in-game after
