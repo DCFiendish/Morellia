@@ -3,6 +3,21 @@
 Per `docs/research-todo/10-asset-sourcing-and-licensing.md`'s policy: source + license per asset,
 recorded here as they're added.
 
+## Kar98K (`resourcepack/assets/morellia/models/item/kar98k-import.bbmodel`, exported via obj³)
+
+- **Source**: "Low-Poly Kar98K" by TastyTony —
+  https://sketchfab.com/3d-models/low-poly-kar98k (glTF/.glb download)
+- **License**: CC-BY 4.0 (attribution required — credit TastyTony wherever this asset is credited
+  publicly)
+- **Pulled**: 2026-08-30
+- **Notes**: reimported from scratch (not via Blockbench's native glTF importer, which mis-scales
+  some parts on this file — see `docs/blockbench-reference/gltf_import_scale_bug.md`), rescaled to
+  match `springfield.json`'s unit convention, recolored from the source file's
+  `KHR_materials_pbrSpecularGlossiness` `diffuseFactor` values (Blockbench doesn't read this
+  extension natively). Exported through the obj³ pipeline rather than a traditional item model —
+  see `docs/blockbench-reference/obj3_weapon_import_playbook.md` for the full process. TastyTony
+  has several more rifles in the same series; the same import fixes are expected to apply.
+
 ## Musket (`assets/morellia/models/item/musket.json`, `assets/morellia/textures/item/musket.png`)
 
 - **Source**: "WWI & WWII rifles" resource pack by memava —

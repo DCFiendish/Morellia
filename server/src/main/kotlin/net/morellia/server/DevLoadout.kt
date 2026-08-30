@@ -1,7 +1,13 @@
 package net.morellia.server
 
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.minestom.server.MinecraftServer
+import net.minestom.server.component.DataComponents
 import net.minestom.server.event.player.PlayerSpawnEvent
+import net.minestom.server.item.ItemStack
+import net.minestom.server.item.Material
+import net.minestom.server.item.component.CustomModelData
 
 /**
  * Local playtesting only: hands every real (non-bot) player a full weapons loadout on every
@@ -62,6 +68,21 @@ object DevLoadout {
                 TestWeapons.karabiner.setAmmo(TestWeapons.karabiner.toItemStack(), TestWeapons.karabiner.magazineSize),
             )
             inventory.setItemStack(21, TestWeapons.karabinerRound.toItemStack().withAmount(20))
+
+            // TEMP: raw obj³ export visual check for the Kar98k import (see docs/HANDOFF.md's
+            // 2026-08-30 status update) -- not a real Gun yet, just an iron_ingot carrying the
+            // custom_model_data string the scratch export's item override matches on. Remove once
+            // the model is confirmed and wired into the real TestWeapons.kt pipeline.
+            try {
+                val testStack =
+                    ItemStack.of(Material.IRON_INGOT)
+                        .with(DataComponents.CUSTOM_MODEL_DATA, CustomModelData(listOf(), listOf(), listOf("kar98k_lowpoly"), listOf()))
+                        .with(DataComponents.ITEM_NAME, Component.text("KAR98K TEST", NamedTextColor.RED))
+                inventory.setItemStack(22, testStack)
+                println("[DevLoadout] kar98k test item set for ${player.username}: $testStack")
+            } catch (e: Exception) {
+                println("[DevLoadout] FAILED to set kar98k test item for ${player.username}: ${e.stackTraceToString()}")
+            }
         }
     }
 }

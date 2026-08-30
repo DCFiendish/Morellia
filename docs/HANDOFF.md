@@ -561,6 +561,168 @@ live in **`tools/agadir-mapgen/README.md`** — this entry is a summary, not a r
   correctly imported at the right scale/position/version. User was pointed at this tradeoff
   explicitly; hasn't chosen a direction as of this commit.
 
+## Status update (2026-08-30): custom-object-layer scripting confirmed working, community layers installed
+
+Direct continuation of the WorldPainter pipeline work above, same day. Resolves the biggest open
+unknown from the 2026-08-29 entry: **`wpscript` can load, paint, and export real custom-object
+(Bo2) layers, not just WorldPainter's built-in procedural Deciduous/Pine.** Verified empirically,
+not just from docs — `wp.getLayer().fromFile('x.layer').go()` loaded a real `Bo2Layer` instance,
+`wp.applyLayer(...).toLevel(n).applyToSurface().setAlways().go()` painted it onto a throwaway test
+world, and `wp.exportWorld(...)` baked real blocks (`jungle_log`/`oak_leaves` confirmed via
+`anvil-parser2` scanning the output `.mca`) into the export — not a GUI-preview-only effect. Full
+details in `tools/agadir-mapgen/README.md`'s new "Custom object layers — RESOLVED" section.
+
+- **Sourced three real Bo2Layer files** from Lerfing's free WorldPainter tutorial content
+  (Patreon post, not TreeForge): palm, taiga, and generic-swamp layers, now committed at
+  `tools/agadir-mapgen/community-layers/`. License terms for these specific files aren't confirmed
+  yet (Patreon itself is unreachable from this session's tooling — blocked/403) — treat as
+  provisional until an explicit statement is found, unlike the memava/TastyTony assets which do
+  have one.
+- **Also installed Lerfing's Custom Brushes pack** (47 terrain-shaping greyscale brushes) into
+  WorldPainter's real config-folder convention, `%APPDATA%\WorldPainter\brushes\Custom Brushes\`
+  — confirmed via direct `WPGUI.jar`/`Configuration.class` bytecode inspection that this is
+  actually where WorldPainter looks (Windows: `%APPDATA%\WorldPainter`; this differs by OS). Purely
+  a GUI convenience for whoever picks up manual terrain painting — `wpscript` doesn't need this.
+- **The TreeForge `.schem` files are still not wired into anything** — those are raw Sponge
+  Schematics, not pre-built `.layer` files like Lerfing's, so the remaining open question is
+  whether `.schem` → Bo2 object-collection conversion itself can be scripted or needs one manual
+  GUI pass through WorldPainter's "Custom Objects" import wizard per species. See the README's
+  open-items list, item 1.
+- **Still not run**: `agadir-import-v2.js` itself (tree density/texture/latitude fixes) — the
+  source SRTM15+ GeoTIFF and its derived heightmap/latitude/noise PNGs aren't on disk anymore
+  (checked; not in `tools/agadir-mapgen/`, not in Downloads), so re-running it needs a fresh
+  OpenTopography download first (needs the user's own free API key, portal.opentopography.org —
+  not something Claude can do standalone). Wiring the new palm/taiga/swamp layers into the actual
+  biome-zoning logic is a separate follow-up after that, still just a design decision now, not a
+  technical blocker.
+
+## Status update (2026-08-30, continued): `.schem` → `.layer` conversion also solved, no GUI needed
+
+Same day, direct continuation. The remaining open question above — whether the TreeForge `.schem`
+files specifically could become real paintable layers, or whether that conversion needed a manual
+WorldPainter GUI pass — is now **also resolved, and also fully scriptable**, not just the
+already-built Lerfing layers. `tools/agadir-mapgen/MakeLayer.java` (run via the new
+`make-layer.sh`) converts any set of `.schem` files straight into a real `.layer` file using
+WorldPainter's own jars as a library — no GUI involved at any point. Converted and verified both
+`treeforge-oak.layer` and `treeforge-pine.layer` this way (confirmed real `oak_wood`/`oak_leaves`
+blocks in a test export, same verification method as the Lerfing layer test above).
+
+- **Real technical gotcha for whoever extends this**: WorldPainter has two different classes for
+  reading tree/object schematics — the legacy `org.pepsoft.worldpainter.layers.bo2.Schematic`
+  (old pre-1.13 MCEdit `.schematic` format, throws on a real modern `.schem`) and the modern
+  `org.pepsoft.worldpainter.layers.bo2.Schem` (Sponge Schematic, what TreeForge and basically
+  everything modern actually exports) — easy to grab the wrong one by name alone.
+  `Schem.load(File)` handles decompression and returns a ready `WPObject`.
+  `new Bo2ObjectTube(name, objects)` is the weighted-random multi-object container (confirmed via
+  decompiling a real Lerfing `.layer` file that voxel data is embedded inline in these, not
+  referenced by external path — `.layer` files are fully self-contained). Wrap in
+  `new Bo2Layer(tube, name, color)`, serialize with `ObjectOutputStream`+`GZIPOutputStream` — that
+  pairing is the entire `.layer` file format.
+- **User feedback mid-session**: Lerfing's free layers are good quality but only cover 3
+  biomes/features (palm/taiga/swamp) — confirmed directly, not just inferred. With this converter
+  now working, filling the rest is unblocked from two directions: more TreeForge species (only
+  Oak/Pine done; Ash/Birch/Cherry Grove/Palm/Weeping Willow/Spiral Spruce still available from the
+  same already-vetted source), or
+  [sijmenvb/worldpainter-trees](https://github.com/sijmenvb/worldpainter-trees) (MIT licensed, 16
+  layers/11 biomes as ready `.schem` sets — badlands, jungle, savanna, roofed forest, swamp, spruce,
+  rocks, etc. — cloned to a scratchpad for inspection this session, not yet copied into the repo).
+  Full details and the exact open sub-items in `tools/agadir-mapgen/README.md`.
+
+## Status update (2026-08-30): Kar98k glTF import — found and fixed a real Blockbench importer bug
+
+Separate thread from the mapgen work above: continuing the obj³ weapon-asset pipeline from the
+2026-08-29 research entry (asset-sourcing research, no model work done yet). Picked up where that
+left off — the user had downloaded TastyTony's "Low-Poly Kar98K" `.glb` (Sketchfab, CC-BY 4.0) and
+gotten as far as having it sitting in Downloads, nothing imported yet.
+
+- **Blockbench now has a native glTF importer** (`import_gltf` action, "Import glTF" dialog with a
+  Scale/Import Groups/Import Animations form) — the marketplace "glTF Importer" plugin the
+  2026-08-29 research assumed was required is no longer necessary on this Blockbench version.
+- **Found a real bug in that native importer, not a bad source file**: some nodes whose transform is
+  encoded as a raw 4x4 `matrix` (vs. separate translation/rotation/scale fields) get their scale
+  wildly mis-extracted on import — a barrel/rod piece came in ~11.5x too large, a small stud came in
+  ~48x too large, while plain TRS-transformed nodes imported correctly. Symptom in-viewport: a few
+  parts look like giant slabs or disconnected floating pieces while the rest of the model looks
+  fine — easy to mistake for a broken/low-quality source file (this file's own Sketchfab listing has
+  no description or comments about geometry issues, and it isn't an armature/skinning problem
+  either — confirmed zero skins/joints in the file). Full root-cause writeup, the diagnostic method,
+  and a working from-scratch reimport script (bypasses Blockbench's buggy conversion entirely by
+  driving Three.js's own `GLTFLoader` directly via `risky_eval`) are in
+  [`docs/blockbench-reference/gltf_import_scale_bug.md`](blockbench-reference/gltf_import_scale_bug.md) —
+  **check that doc before importing any of this creator's other rifle models** (TastyTony has
+  several more in the same "Low-Poly Rifles" series, likely exported the same way from the same
+  Blender setup, so expect the same bug).
+- Also confirmed (same doc, "Gotcha 3"): this model's colors are stored via the deprecated
+  `KHR_materials_pbrSpecularGlossiness` extension, which Blockbench doesn't read at all, so nothing
+  comes in textured/colored — unrelated to the scale bug, just means every import from this creator
+  will need its color baked in separately from the raw `diffuseFactor` values.
+- **Current state**: `resourcepack/assets/morellia/models/item/kar98k-import.bbmodel` has the
+  corrected geometry (all 47 parts rebuilt with correct world-space positions, rescaled to match
+  `springfield.json`'s existing unit convention — real Kar98k and Springfield 1903 are almost
+  exactly the same real-world length, so the same target scale applies) and is now colored: baked
+  the six `KHR_materials_pbrSpecularGlossiness` `diffuseFactor` values (linear RGB, gamma-corrected
+  to sRGB) into a small palette texture, mapped each of the 47 meshes to its original material via
+  `gltf.meshes[n].primitives[0].material`, and pointed every face's UV at a flat swatch (no real UV
+  unwrap needed since every source material is a flat color, not an image). Reads as a correctly
+  wood-stocked, dark-metal Kar98k now, matching the reference render's color separation. **Not yet
+  exported through the obj³ pipeline, not yet wired into `resourcepack/`** — this is still a working
+  `.bbmodel` file, not a finished in-game asset. That obj³ export (per the 2026-08-29 entry's
+  "Exact next steps") is the next real step.
+
+## Status update (2026-08-30, continued): obj³ export working end-to-end in the real client, hand pose still being tuned
+
+Same day, direct continuation. The Kar98K now renders correctly — right shape, right colors —
+when held in-game via the real obj³ export, verified in the actual Minecraft client (not just
+Blockbench's preview). This is the first weapon in this project actually pushed through the full
+obj³ pipeline rather than a traditional item model, so most of what follows is now captured as a
+reusable process, not just a one-off fix:
+
+- **Found the correct plugin/shader version pairing**: obj³ plugin `0.7.0` matches shader tag
+  `26.2` of `JagerMeistars/obj-cubed` — pulling shaders from `main` instead silently drifts toward
+  a newer Minecraft build's shader format and crashes the client on connect
+  (`ShaderManager$1.applyImport` NPE, "Required resource pack was not loaded"). Also re-confirmed
+  the plugin-filename-must-match-its-internal-`id` loading quirk from earlier obj³ research.
+- **Full replication steps are now written up** in
+  [`docs/blockbench-reference/obj3_weapon_import_playbook.md`](blockbench-reference/obj3_weapon_import_playbook.md)
+  — covers import → bug fixes → obj³ export → pack merge/deploy → hand-pose solving, so the next
+  rifle (another TastyTony model, or a different creator entirely) doesn't have to re-discover any
+  of this.
+- **Third-person hand pose — real progress, not yet fully done.** Root-caused *why* Blockbench's
+  own Display-mode gizmo (the obvious built-in tool for this) couldn't be trusted here: this
+  project's unofficial Minecraft build (26.2) has a real hand-bone position mismatch against
+  Blockbench's bundled preview rig (confirmed via a literal "relocated entity geometry" comment in
+  the 26.2-tagged shader source) — so the preview's rotation is trustworthy but its absolute
+  translation is not. Solved the translation properly via matrix math instead of guessing
+  per-axis (full method in the playbook doc, §5): picked a grip point `G` in local space, solved
+  `T = -R·G` for the chosen rotation, and combined with an empirically-needed +~20-unit world-Y
+  correction for the preview/real-client mismatch. Current values:
+  `rotation: [60, 90, 0]`, `translation: [0, 25, -0.53]` — this gets the gun correctly oriented
+  (pointing forward, right height, no longer floating at floor level or off to the side) but the
+  **grip point itself needs one more refinement pass**: latest in-game check shows the pose is
+  lined up correctly but the player's hand isn't quite at the trigger/wrist-of-stock yet, meaning
+  the estimated `G = (2.4, 2, 0)` was a bit off. Next step per the playbook's §5 step 5: refine `G`
+  from the model's actual stock/wrist bounding box and re-solve, rather than nudging translation
+  by feel.
+- **GUI/hotbar icon still shows blank** — known, deferred limitation, not a bug in this export
+  specifically: the vanilla item selector's `gui` display_context isn't an explicit case, so it
+  falls through to the shader-dependent `default` model, which doesn't render outside the
+  entity/item-in-hand rendering path. Documented as a real follow-up in the playbook (§4) — needs
+  an explicit `"when": "gui"` case pointing at a conventional flat icon, not the baked geometry.
+- **Left in place for the next session**: `DevLoadout.kt`'s `TEMP` block (slot 22, an `iron_ingot`
+  carrying the test `custom_model_data`) — intentionally not removed yet since the pose isn't
+  confirmed final. Remove it and wire the model into `TestWeapons.kt` (matching the
+  `springfield`/`karabiner` pattern) once the grip point is confirmed correct.
+- **Not yet done**: `resourcepack/CREDITS.md` entry for the Kar98K model (TastyTony, CC-BY 4.0),
+  and the real merge of the obj³ export into `resourcepack/assets/` itself (right now only the
+  built `server/resourcepack.zip` has the merged output — the scratch export directories from this
+  session were not copied into the tracked `resourcepack/` source tree).
+
+**Exact next step for a fresh session**: re-estimate the grip point `G` (likely needs to move
+further into +Z or adjust X — look at where the stock's wrist sits in the `.bbmodel` relative to
+its own origin), re-solve `T = -R·G` with `R` for rotation `[60, 90, 0]`, re-export, rebuild
+`resourcepack.zip`, restart the local server, and check in-client whether the player's hand now
+sits on the trigger. The math/tooling is all in place — this is calibration, not new engineering.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically
