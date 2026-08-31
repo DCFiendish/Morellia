@@ -723,6 +723,125 @@ its own origin), re-solve `T = -R·G` with `R` for rotation `[60, 90, 0]`, re-ex
 `resourcepack.zip`, restart the local server, and check in-client whether the player's hand now
 sits on the trigger. The math/tooling is all in place — this is calibration, not new engineering.
 
+## Status update (2026-08-30, continued): first-person + left-hand poses fixed, real root cause found
+
+Direct continuation, same day. Blockbench MCP connected cleanly this session (unlike the prior
+"installed but never handshakes" entry above) with the Kar98K project live — used it to diagnose
+and fix a real bug, not just push numbers around blind.
+
+- **User had hand-tuned third-person AND first-person right-hand poses directly in Blockbench**
+  (`thirdperson_righthand`: rotation `[86,90,0]`, translation `[0.5,6.5,3.97]` — superseding the
+  matrix-derived `[60,90,0]`/`[0,25,-0.53]` from the entry above; `firstperson_righthand`: rotation
+  `[0,86,0]`, translation `[0,4.25,0]`) but first-person never showed up in-game.
+- **Root-caused for real, not guessed**: this was never a Blockbench-preview-vs-real-client
+  mismatch (unlike the earlier +20-unit-Y quirk, which genuinely is one). Unzipped the actual
+  shipped `server/resourcepack.zip` and found `firstperson_righthand`/`thirdperson_lefthand`/
+  `firstperson_lefthand` baked in as all-zero in every exported model file, despite
+  `firstperson_righthand` being correctly non-zero in the live Blockbench project. Traced to the
+  obj³ export dialog itself: its Vue component holds **separate per-context fields**
+  (`dThird*`/`dLeft*`/`dFpr*`/`dFpl*`) that do **not** auto-sync from `Project.display_settings` —
+  a `_loadFromDisplaySettings()` method exists to pull all of them in one shot, but the playbook's
+  previously-documented export snippet only ever synced `dThird*` by hand, so first-person and both
+  left-hand contexts silently exported as zero every time, every session, for every gun so far.
+  This is a **systemic bug in the documented process itself**, not a one-off mistake on this model.
+- **Fixed and verified for the Kar98K specifically**: computed the left-hand mirror of both tuned
+  right-hand poses (Minecraft flips the model across local X for off-hand rendering, so the correct
+  mirror is: negate X-translation, keep X-rotation, negate Y/Z-rotation — derived from first
+  principles, not copied from an existing asset, since this project doesn't have a prior symmetric
+  obj³ example to crib from). Wrote all four contexts into `Project.display_settings` via MCP,
+  called `_loadFromDisplaySettings()` + `doExport()`, and confirmed the new export produces separate
+  baked model files (`kar98k_lowpoly_{thirdperson,firstperson}_{right,left}hand.json`) each with the
+  correct non-zero `display` entry, and that the item selector JSON now has explicit
+  `display_context` cases for all four (previously only `thirdperson_righthand`/`ground`/`on_shelf`
+  had cases; everything else silently fell through to the untransformed `default` model — this is
+  what "doesn't load in that spot" actually looked like in-game, not an error or missing render).
+- **Deployed to the local dev server**: merged the new export into a full pack copy (existing
+  shaders/atlases/items layered with the new `assets/objcubed/*` + `iron_ingot.json`), rebuilt
+  `resourcepack.zip` via `jar cf`, killed and restarted the `:server:run` process (confirmed clean
+  boot, zero errors), confirmed `jwebserver` is serving the new 499KB zip. **Also merged the export
+  for real into the tracked `resourcepack/assets/` source tree this time** (`objcubed/`, the shader
+  base pack, `minecraft/items/iron_ingot.json`, `minecraft/atlases/blocks.json`) — closes the "not
+  yet done" gap flagged in the entry above. Saved the live Blockbench project back over
+  `kar98k-import.bbmodel` too (its `save_path` was empty — the open project was a fresh
+  in-memory session, not bound to the tracked file — so this would otherwise have been lost on
+  close).
+- **Playbook doc rewritten** ([obj3_weapon_import_playbook.md](blockbench-reference/obj3_weapon_import_playbook.md)
+  §4) with the corrected export procedure (`_loadFromDisplaySettings()`, not manual per-field
+  sync) and the mirror-math formula, so the next weapon doesn't reproduce this bug.
+- **Not yet done / genuinely next**: none of the new poses have been eyeballed in the real client
+  yet this session — right-hand third/first-person should look like what the user already tuned,
+  but that still needs an in-game glance since the export pipeline itself was the thing under
+  suspicion; left-hand (both third and first person) needs the player's Main Hand setting switched
+  to Left in-game to check at all, and the mirror formula is principled but unverified — first time
+  this project has authored a left-hand transform for anything via obj³. Grip-point-only refinement
+  (moving `G` to land the hand exactly on the trigger, the task this session started as) hasn't
+  been resumed yet — right/first-person values changed since that math was last solved, so revisit
+  once the current export is confirmed visually correct.
+- `resourcepack/CREDITS.md` entry for the Kar98K and `DevLoadout.kt`'s `TEMP` block removal are
+  both still outstanding, unchanged from the entry above — still gated on the pose being fully
+  confirmed, not just exported correctly.
+
+## Status update (2026-08-31): real root cause of "too low" found and fixed — pose confirmed close in-game
+
+Direct continuation. The third-person pose from the entry above ("way too low, not out in front
+tho") turned out to have a precise, provable cause, found by reading the obj-cubed **encoder**
+source (`objcubed.js`), not just the shader — this is the actual resolution the whole
+recentering/grip-point effort above was building toward.
+
+- **Verified the grip-point recentering was geometrically sound first**: dropped a temporary marker
+  cube at local `(0,0,0)` in the live `kar98k-import.bbmodel` project and screenshotted an
+  orthographic side view — the marker sits exactly in the grip pocket at the trigger, confirming the
+  earlier `(7,-3.5,0)` vertex shift found the right point. This ruled out "bad grip point" as the
+  cause of the residual Y error before looking anywhere else.
+- **Root cause, found in `objcubed.js` directly**: the encoder unconditionally bakes `Y - 0.5`
+  (one full half-block) into every exported vertex position, because it assumes the model is built
+  "on the floor" (local Y=0 = block bottom) like a normal vanilla JSON model — see its own comment
+  at the position-baking step ("VERTICAL ORIGIN CONVENTION... bake Y - 0.5 here... a floor-built
+  model rides half a block high everywhere" without it). Recentering the grip to local Y=0 (instead
+  of the model's floor) broke that assumption: the encoder kept subtracting the half-block from the
+  *grip* instead of the floor, producing a constant half-block-low error baked directly into the
+  texture — independent of the display-rotation math, and affecting **every context that reads the
+  same PNG at once** (third-person, first-person, ground, GUI), which is exactly why first-person
+  also looked wrong even though its own `display` JSON values were never touched.
+- **Fix**: the obj³ export dialog has a `Model Offset Y` field (`dlg.content_vue.offsetY`) meant
+  for exactly this. Setting it to `0.5` before export cancels the encoder's built-in `-0.5`
+  precisely, so the recentered grip point decodes to true zero — matching what the
+  `T = 16·(I−R)·(0.5,0.5,0.5)` swing-cancellation formula already assumed. No change to the
+  rotation/translation values themselves was needed, only this one export-dialog field.
+- **Re-exported, merged, redeployed**: confirmed `_loadFromDisplaySettings()` still carried the
+  already-correct `thirdperson_{right,left}hand` (`[75,90,0]` / `[0,-1.798,2.343]`) and
+  `firstperson_{right,left}hand` (`[0,90,0]` / `[0,5,0]`) values through unchanged, exported with
+  `offsetY=0.5`, merged into `resourcepack/assets/`, rebuilt `resourcepack.zip`, restarted the
+  dev server (a stale detached-launch process from an earlier point in the session had to be killed
+  first — `netstat`/`Get-Process` by port, not assumed), and relaunched the test client as
+  `devtest2`.
+  - **Tooling note**: launching either the server or the `morellia-testclient` gradle wrapper via
+    the Bash tool's `cmd //c` wrapper silently fails ("gradlew.bat not recognized") whenever the
+    working directory contains a space (`Minecraft Dev\morellia-testclient` specifically) — `cd`/
+    `dir`/`where` all work fine through the same wrapper, only the actual batch-file execution
+    breaks, root cause not fully identified. The PowerShell tool's `Start-Process` does not have
+    this problem; use it for anything launched from a path with a space.
+- **User-confirmed in the real client**: "it actually looks really close" — third-person right-hand
+  pose is now correctly positioned and oriented with no further hand-tuning beyond the formula
+  above. This is the first time this pipeline has produced a correct pose from math alone, with no
+  empirical fudge factor layered on top.
+- **Generalized into the playbook**:
+  [`obj3_weapon_import_playbook.md`](blockbench-reference/obj3_weapon_import_playbook.md) was
+  rewritten to present this as the standard process for *any* mesh import (not Kar98K-specific):
+  §3.5 recentering technique (with the marker-cube verification step), §4's `offsetY=0.5` rule, and
+  §5's closed-form swing-cancellation formula superseding the old "+20 units empirically" fudge
+  (which was masking these two real bugs, not compensating for a genuine preview/client mismatch —
+  that theory is now retired). Also added a pointer from
+  [`.claude/skills/blockbench-modeling/SKILL.md`](../.claude/skills/blockbench-modeling/SKILL.md)
+  (force-added despite the repo's blanket `.claude/` gitignore, at the user's explicit request) so
+  a future session reaches for the right pipeline instead of the cube-placement one.
+- **Not yet done**: left-hand (third and first person) still hasn't been visually confirmed in-game
+  — only right-hand has been checked so far, same gap noted in the entry above. GUI/inventory
+  rendering for obj³ items is still unhandled (falls through to the untransformed `default` model,
+  per the known limitation in playbook §4). `resourcepack/CREDITS.md` entry for the Kar98K and
+  `DevLoadout.kt`'s `TEMP` block removal remain outstanding, same as every entry above — still
+  gated on the full pose (including left-hand) being confirmed.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically

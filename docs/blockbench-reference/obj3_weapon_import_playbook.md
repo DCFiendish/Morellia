@@ -1,10 +1,36 @@
-# Playbook: importing a Sketchfab rifle model through the obj³ pipeline
+# Playbook: importing any low-poly mesh (glTF/.glb/.obj) through the obj³ pipeline
 
-Step-by-step replication guide, distilled from the Kar98K import (2026-08-30). Follow this in
-order for the next model — one of TastyTony's other "Low-Poly Rifles" series entries, or any
-similar glTF/.glb rifle from a different creator. Read
-[`gltf_import_scale_bug.md`](gltf_import_scale_bug.md) first for the two import bugs referenced
-in step 2 — this doc assumes you already know what they are and just tells you when to apply them.
+Step-by-step replication guide, distilled from the Kar98K import (2026-08-30 through 2026-08-31).
+Follow this in order for the next model — one of TastyTony's other "Low-Poly Rifles" series
+entries, a similar rifle from a different creator, or any other low-poly Blender/glTF model that
+needs to be held/worn correctly in-game. Nothing in this pipeline is Kar98K-specific or
+weapon-specific; every step below is either a property of the **obj-cubed plugin itself** (applies
+to any mesh it exports) or a **generic technique** you re-derive per model (grip point, rotation).
+Read [`gltf_import_scale_bug.md`](gltf_import_scale_bug.md) first for the two import bugs
+referenced in step 2 — this doc assumes you already know what they are and just tells you when to
+apply them.
+
+## What actually changes the raw geometry, vs. what's just a per-slot transform
+
+Easy to conflate these — they're different kinds of operations, done at different stages:
+
+1. **Fixing a broken import (conditional, only if the creator-family bug in step 2 is present)**:
+   rebuilds the mesh from each glTF node's correct `matrixWorld`, which bakes in that node's own
+   rotation *and* translation *and* scale. This is the only step that can look like "rotating
+   parts of the model" — it's not a deliberate creative rotation, it's Blockbench's importer having
+   discarded the correct transform and this step putting it back.
+2. **Recentering the grip point (step 3.5, always do this)**: a straight **translation** of every
+   vertex by a fixed offset, so the point you want the hand to hold sits at local `(0,0,0)`. No
+   rotation involved — this only moves the model, doesn't reorient it.
+3. **The `display.*.rotation`/`translation` values (step 5)**: not a geometry change at all — these
+   never touch the `.bbmodel`'s vertices. They're a per-context runtime transform Minecraft applies
+   at render time (rotate the whole model around its own origin, then translate). This is the
+   "rotate it so the barrel points forward" step, and it's solved with the formula in step 5, not
+   by eyeballing sliders.
+
+So for a typical new model: expect one conditional geometry rebuild (step 2, only if that bug is
+present), one mandatory geometry translation (step 3.5), and one mandatory *display*-rotation solve
+(step 5) that never touches the mesh itself.
 
 ## 0. Prerequisites (one-time, already done in this repo)
 
@@ -65,26 +91,113 @@ length is a reasonable default; don't re-derive from meters. Save the working fi
 under `resourcepack/assets/morellia/models/item/` (this is a **scratch/working file**, not the
 finished asset — the real deliverable is the obj³ export in step 4).
 
-## 4. Export through obj³
+## 3.5. Recenter the grip point to local origin
 
-In the obj³ export dialog, set the **third-person right-hand display transform now** if you
-already have a rough estimate (see step 5 for how to actually solve it) — but note the dialog has
-its own separate local Vue fields (`vd.dThirdTX/TY/TZ`, etc.) that do **not** stay in sync with
-`Project.display_settings` automatically. Set both explicitly before every `doExport()` call:
+**Do this for every model, always** — it's what makes step 5's math work without guessing.
+
+The obj³-decoded frame is block-centre relative (the shader adds your mesh's local coordinates
+directly onto a fixed hand/world anchor, no smart re-centering). That means whatever sits at your
+mesh's local `(0,0,0)` is the point that lands at the hand. If you leave the model at wherever the
+raw import happened to place it, you'd have to solve for a translation that both (a) points the
+model correctly and (b) drags some arbitrary far-off point into the hand — much harder than it
+needs to be, and it's exactly the kind of multi-axis coupled guessing that ate hours on the Kar98K
+before this technique.
+
+Instead, shift every vertex once so the intended grip (where a hand would wrap the stock/grip,
+typically right around the trigger) sits at exactly `(0,0,0)`:
 
 ```js
-Project.display_settings['thirdperson_righthand'].translation = [x, y, z];
-Project.display_settings['thirdperson_righthand'].rotation = [rx, ry, rz];
-DisplayMode.loadThirdRight();
-DisplayMode.updateDisplayBase();
-vd.dThirdTX = x; vd.dThirdTY = y; vd.dThirdTZ = z;
-vd.dThirdRX = rx; vd.dThirdRY = ry; vd.dThirdRZ = rz;
-vd.doExport();
+// Determine the shift by inspection first (list_outline / bounding boxes / a visual check —
+// see below), then apply it permanently to the .bbmodel:
+const shift = [dx, dy, dz]; // moves your chosen grip point to (0,0,0)
+Outliner.elements.forEach(el => {
+  Object.keys(el.vertices).forEach(key => {
+    for (let i = 0; i < 3; i++) el.vertices[key][i] += shift[i];
+  });
+});
 ```
 
+**Verify visually before trusting it** — don't just guess the shift and move on. Drop a small
+temporary marker cube at `(0,0,0)` (`new Cube({from:[-0.5,-0.5,-0.5], to:[0.5,0.5,0.5]}).init()`),
+take an orthographic side-view screenshot, and confirm the marker sits right in the grip/trigger
+area, not just "close." Remove the marker afterward — it's a visual aid only, not part of the
+export. Getting this point right matters more than any other single step in the whole pipeline;
+every error we chased on the Kar98K that looked like a broken formula turned out to trace back to
+either this point being wrong, or the export offset in step 5 not compensating for it correctly.
+
+## 4. Export through obj³
+
+**Set "Model Offset Y" to `+0.5` before exporting** (the export dialog's `offsetY` field,
+`Transform` section). The obj-cubed encoder always bakes a fixed `Y - 0.5` into every exported
+position, because it assumes your model is built "on the floor" (local Y=0 = the bottom of the
+block, geometry rising upward) like a normal vanilla JSON model. Once you've recentered to the grip
+point in step 3.5, your model's Y=0 is the grip, not the floor — and the encoder still subtracts
+that half-block unconditionally. Left uncorrected, this produces a **constant half-block downward
+error that hits every display context at once** (third-person, first-person, ground, GUI — they all
+decode the same baked PNG), which is exactly the kind of "everything looks too low, including
+contexts I didn't touch" bug that cost the most time on the Kar98K. Setting `offsetY = 0.5` cancels
+the plugin's built-in subtraction exactly, so the grip point (now at local origin) decodes to true
+zero, matching what the translation formula in step 5 assumes. `offsetX`/`offsetZ` stay `0` — only
+Y has this floor-relative convention (X/Z are already block-centre relative with no correction
+needed, matching the plugin's own "horizontal origin = block centre" convention).
+
+**Every hand-related display context you want in-game must be present in the export dialog's own
+Vue fields before you call `doExport()` — they do NOT read live from `Project.display_settings`
+on their own.** This is the single biggest gotcha in this whole pipeline (found the hard way on the
+Kar98K: third-person right-hand was tuned correctly and exported fine, but first-person right-hand
+and both left-hand contexts were left at their all-zero default and got baked that way — not a
+Blockbench-preview-vs-real-client mismatch, just missing data. In-game this showed up as the
+first-person/left-hand poses silently falling back to the untransformed `default` obj³ model
+instead of "not loading" or erroring.).
+
+The dialog's Vue component exposes one field-group per context — `dThird*` (thirdperson_righthand),
+`dLeft*` (thirdperson_lefthand), `dFpr*` (firstperson_righthand), `dFpl*` (firstperson_lefthand),
+plus `dHead*`/`dGui*`/`dGround*`/`dFixed*`. It also has a `_loadFromDisplaySettings()` method that
+copies **all** of these from `Project.display_settings` in one call — use that instead of hand-
+copying individual fields (the old `vd.dThirdTX = ...` pattern shown in earlier versions of this doc
+only ever touched third-person and is why the bug above happened):
+
+```js
+// 1. Author every context you care about in Project.display_settings first (rotation/translation
+//    triples, degrees + Blockbench units) — via Blockbench's own Display-mode UI/gizmo, or directly:
+Project.display_settings['thirdperson_righthand'].rotation = [rx, ry, rz];
+Project.display_settings['thirdperson_righthand'].translation = [x, y, z];
+// ...same for thirdperson_lefthand / firstperson_righthand / firstperson_lefthand.
+// See the mirroring note below for deriving the two lefthand entries from their righthand pair.
+
+// 2. Open the export dialog, then sync ALL context fields from Project.display_settings in one call:
+BarItems.objcubed_export.click();
+const dlg = Dialog.stack.find(d => d.id === 'objcubed_dialog').content_vue;
+dlg._loadFromDisplaySettings();
+dlg.offsetY = 0.5; // cancel the plugin's built-in floor-relative -0.5 bake — see above
+
+// 3. Point the export at a scratch folder (not resourcepack/ directly), then export:
+dlg.resourcePackDir = '<scratch path>';
+dlg.doExport(); // async — poll dlg.status / dlg.statusKind / dlg.running rather than awaiting directly
+```
+
+Sanity-check before merging: open each generated `assets/objcubed/models/item/<name>_<context>.json`
+and confirm its own `display.<context>` entry is non-zero (all four hand-context files carry a full
+copy of every context's transform, not just their own — check the one matching the filename).
+
+**Mirroring right-hand to left-hand**: Minecraft's client renders the off-hand item by flipping the
+model across local X before applying the `*_lefthand` transform, so the correct mirror of a tuned
+righthand transform is: negate X-translation, keep X-rotation, negate Y/Z-rotation. I.e. for
+`rotation: [rx, ry, rz]`, `translation: [tx, ty, tz]` on `*_righthand`, the matching `*_lefthand`
+entry is `rotation: [rx, -ry, -rz]`, `translation: [-tx, ty, tz]`. This is derived from the
+conjugation `M·R·M` / `M·T` where `M = diag(-1,1,1)` — not empirically tuned, so **verify it in-game
+with the player's Main Hand setting switched to Left** before trusting it for a new model. Not yet
+done for the Kar98K as of this writing — the mirrored values have been exported and merged, but
+only right-hand has been visually confirmed against the real client. Confirm left-hand before
+calling any model's pose fully done.
+
 The export produces `assets/objcubed/models/item/<name>_{default,ground,on_shelf,
-thirdperson_righthand}.json`, `assets/objcubed/textures/item/<name>.png`, plus a vanilla
-`assets/minecraft/items/<base_item>.json` selector keyed on a `custom_model_data` string.
+thirdperson_righthand,thirdperson_lefthand,firstperson_righthand,firstperson_lefthand}.json`,
+`assets/objcubed/textures/item/<name>.png`, plus a vanilla `assets/minecraft/items/<base_item>.json`
+selector — the selector only gets an explicit `display_context` case for whichever of these you
+actually populated non-zero data for before export (confirmed: exporting with only third-person set
+produces a selector with only a `thirdperson_righthand` case; exporting after syncing all four hand
+contexts produces cases for all four automatically — no manual selector editing needed either way).
 
 **Known limitation, not yet solved**: the `gui` display context isn't handled by the generated
 selector — it falls through to the `fallback` case (the `default` obj³ model), which doesn't
@@ -92,39 +205,54 @@ render through the shader in the inventory/hotbar rendering path, so the item sh
 GUI. Fixing this needs an explicit `"when": "gui"` case pointing at a conventional flat icon model
 — not yet done for any of these obj³ weapons, deferred by design so far.
 
-## 5. Solve the third-person hand transform with math, not sliders
+## 5. Solve the hand transform with a closed-form formula, not sliders
 
-Blockbench's Display-mode gizmo *looks* like the right tool for this, and normally is — but on
-this project's unofficial Minecraft build (26.2), the bundled player-model reference Blockbench
-previews against does **not** match the real client's actual hand-bone position (confirmed: the
-obj³ shader source itself has a "relocated entity geometry" comment for this build). That means
-the live preview can be trusted for **rotation** but not for absolute **translation** — validate
-translation against the real client, not the Blockbench preview.
+**Superseded 2026-08-31**: earlier versions of this doc solved `T = -R·G` and then patched the
+remaining error with an empirically-found "+20 units of Y" fudge, attributed to a preview/
+real-client mismatch. That fudge was actually masking two real, fixable bugs (the anchor-swing
+effect and the missing `offsetY` export setting below) — once both are handled, **no empirical
+fudge factor is needed at all**. Don't reuse "+20" or any other leftover constant from an older
+model; re-derive from the formula below every time.
 
-The transform composes as `world = T + R·local` (rotate first around the model's own origin, then
-translate in world space) — confirmed by comparing Blockbench's live `display_base` matrix against
-an independently-built `THREE.Matrix4.compose(position, quaternion, scale)`. This means **a 90°+
-yaw silently remaps which world axis a given translation component actually moves along** — don't
-adjust X/Y/Z by feel one at a time when a large rotation is already set; a change intended to pull
-the gun "closer" can visually shift it sideways instead.
+**Why simple `T = -R·G` isn't enough**: Minecraft bakes each display slot's rotation+scale into a
+tiny placeholder quad at model-load time, and the obj³ shader reconstructs your model's rotation by
+reading that quad's own baked corners back out. That placeholder's own anchor corner sits at block
+**centre** (`0.5, 0.5, 0.5` in block units), not at your model's local origin — so rotating the
+model also swings that anchor through an arc, on top of whatever translation you apply. At small
+rotations this is easy to miss; at the large rotations a rifle typically needs (60-90°+ to go from
+"lying flat as imported" to "held naturally"), the swing dominates and makes translation nudges
+behave counter-intuitively (push it back, it also drifts sideways) — this is what actually derailed
+the Kar98K for hours before we read the shader source directly.
 
-Correct method once you've picked a rotation (start from an existing working gun's rotation, e.g.
-Kar98K's `[60, 90, 0]`, if the new model is a similar-shaped bolt-action rifle):
+**The fix — cancel the swing exactly, for any chosen rotation**:
 
-1. Estimate the desired **grip point** `G` in the model's own local coordinates — where the
-   trigger/wrist-of-stock sits, from the bounding box of that part.
-2. Build the rotation-only matrix `R` for the chosen Euler rotation (XYZ order, degrees).
-3. Solve `T = -R·G` — this is the translation that places `G` at the world origin, i.e. at the
-   hand anchor.
-4. Apply, export, rebuild the pack, redeploy, and check against the **real client**. If the height
-   looks wrong even though the math is correct, that's the known preview/real-client mismatch —
-   nudge the translation's world-Y empirically against real footage rather than recomputing G
-   (this project's Kar98K needed roughly +20 units of Y beyond the pure math solution for this
-   reason — treat that offset as a per-build constant to try first on the next model, not
-   something to re-derive from scratch).
-5. If the trigger/grip still isn't quite at the hand after that, refine `G` (you likely
-   underestimated or overestimated where the wrist-of-stock sits relative to the model's origin)
-   and re-solve — don't fall back to blind per-axis dragging once you have working math.
+1. Recenter the grip point to local origin first (step 3.5) — this formula assumes `G = (0,0,0)`.
+2. Pick the barrel-forward rotation `R` you want (Euler XYZ, degrees — start from an existing
+   working gun's rotation as a first guess for a similarly-shaped weapon, e.g. the Kar98K's
+   `[75, 90, 0]`, but expect to need a different value for a differently-shaped model).
+3. Compute the translation that keeps the (now-centred) grip point fixed at the hand anchor for
+   that rotation, using Blockbench's own matrix utilities (not hand arithmetic — sign/order
+   mistakes are easy):
+   ```js
+   const e = new THREE.Euler(r[0]*Math.PI/180, r[1]*Math.PI/180, r[2]*Math.PI/180, 'XYZ');
+   const R = new THREE.Matrix4().makeRotationFromEuler(e);
+   const anchor = new THREE.Vector3(0.5, 0.5, 0.5);
+   const rotatedAnchor = anchor.clone().applyMatrix4(new THREE.Matrix4().extractRotation(R));
+   const T = anchor.clone().sub(rotatedAnchor).multiplyScalar(16); // display.translation units
+   ```
+   This is `T = 16·(I−R)·(0.5,0.5,0.5)`. It's exact, not an approximation — it holds regardless of
+   how large the rotation is.
+4. **Also set the export dialog's `offsetY = 0.5`** (step 4) — this formula assumes the recentered
+   grip decodes to exactly `(0,0,0)`, which is only true once the plugin's own floor-relative
+   `-0.5` bake is cancelled. Skipping this reintroduces a constant half-block-low error that looks
+   like the formula is wrong when it isn't.
+5. Apply to `Project.display_settings`, export, rebuild the pack, redeploy, and check against the
+   real client. If it's still off after both fixes above, the grip point itself (step 3.5) is the
+   most likely culprit — verify it with the marker-cube screenshot before touching this formula
+   again.
+
+Confirmed on the Kar98K: after both fixes, third-person right-hand needed no further hand-tuning at
+all beyond picking the rotation — translation came directly from the formula.
 
 ## 6. Rebuild and redeploy the local test pack
 
@@ -142,6 +270,13 @@ Kar98K's `[60, 90, 0]`, if the new model is a similar-shaped bolt-action rifle):
 - If a dev client's saved inventory from a previous test session is stale, it can silently
   overwrite the spawn-time test item — move the player's `.dat` file aside
   (`server/morellia-data/vanilla/playerdata/<uuid>.dat`) if the test item doesn't appear.
+- Launching `gradlew.bat` for either the server or `morellia-testclient` from a Bash tool's
+  `cmd //c` wrapper silently fails with "not recognized as an internal or external command" when
+  the working directory path contains a space (e.g. `Minecraft Dev\morellia-testclient`) — `cd`,
+  `dir`, and `where` all work fine from the same wrapper, only the actual `gradlew.bat` invocation
+  breaks, for reasons not fully root-caused. Use the PowerShell tool instead
+  (`Start-Process -FilePath ".\gradlew.bat" -ArgumentList ... -RedirectStandardOutput ...`) for
+  anything launched from a path with a space in it.
 
 ## 7. Wrap up
 
