@@ -18,43 +18,25 @@ recorded here as they're added.
   see `docs/blockbench-reference/obj3_weapon_import_playbook.md` for the full process. TastyTony
   has several more rifles in the same series; the same import fixes are expected to apply.
 
-## Musket (`assets/morellia/models/item/musket.json`, `assets/morellia/textures/item/musket.png`)
+## Lebel M1886 (`resourcepack/assets/morellia/models/item/lebel-m1886-import.bbmodel`, exported via obj³)
 
-- **Source**: "WWI & WWII rifles" resource pack by memava —
-  https://modrinth.com/resourcepack/rifles (v9.11.1)
-- **License**: MIT (as stated on the Modrinth listing)
-- **Pulled**: 2026-08-26
-- **Notes**: original asset is the pack's "Mosin Nagant" model (`item/rifles/mosinch.json` +
-  `item/rifles/mosin.png`), extracted from its crossbow-rename-predicate wrapper and rewired to be
-  referenced directly via our own `item_model` component. Texture reference inside the model JSON
-  was changed from `item/rifles/mosin` (implicit `minecraft:` namespace) to `morellia:item/musket`;
-  no other edits to the model geometry.
-- `musket-aiming.json`/`.png` (same texture, reused) is a derivative of this model with only the
-  `firstperson_righthand`/`firstperson_lefthand` display translation edited, for the ADS "peering
-  down the barrel" pose -- see `AimingListener.kt`. No other changes.
-
-## Springfield (`assets/morellia/models/item/springfield.json`, `assets/morellia/textures/item/springfield.png`)
-
-- **Source**: "WWI & WWII rifles" resource pack by memava — https://modrinth.com/resourcepack/rifles
-  (local copy used: v8.5, downloaded directly by the user rather than pulled from Modrinth)
-- **License**: MIT (as stated on the Modrinth listing)
-- **Pulled**: 2026-08-26
-- **Notes**: original asset is the pack's Springfield model (`item/rifles/springfieldch.json` +
-  `item/rifles/springfield.png`), same extraction pattern as the musket above (texture reference
-  changed from `item/rifles/springfield` to `morellia:item/springfield`, no geometry edits).
-- `springfield-aiming.json` is a derivative with only the first-person display translation edited
-  for the ADS pose, same as the musket's aiming variant above.
-
-## Karabiner (`assets/morellia/models/item/karabiner.json`, `assets/morellia/textures/item/karabiner.png`)
-
-- **Source**: same pack as above (memava's "WWI & WWII rifles", v8.5), MIT license.
-- **Pulled**: 2026-08-26
-- **Notes**: original asset is the pack's Kar98k model (`item/rifles/kar98kch.json` +
-  `item/rifles/kar98k.png`) — the mind-map plan names this weapon generically as "Karabiner"; this is
-  the specific real-world rifle it maps to. Texture references changed from `item/rifles/kar98k` to
-  `morellia:item/karabiner`, no geometry edits.
-- `karabiner-aiming.json` is a derivative with only the first-person display translation edited for
-  the ADS pose, same as the musket's aiming variant above.
+- **Source**: "Low-Poly Lebel M1886" by TastyTony —
+  https://sketchfab.com/3d-models/low-poly-lebel-m1886-0515c4d0454c430ab7f9a93f1671428c (glTF/.glb
+  download; same creator/series as the Kar98K above)
+- **License**: CC-BY 4.0 (attribution required — credit TastyTony wherever this asset is credited
+  publicly)
+- **Pulled**: 2026-08-31
+- **Notes**: rebuilt from the raw glTF (same matrix-transform scale bug as the Kar98K — see
+  `docs/blockbench-reference/gltf_import_scale_bug.md`), but this file's materials use standard
+  `pbrMetallicRoughness.baseColorFactor` rather than the deprecated specular-glossiness extension,
+  so no manual color-extraction was needed beyond gamma-correcting the same way. Rescaled to ~42.3
+  Blockbench units (real-world Lebel M1886 length vs. Kar98K's, scaled from Kar98K's own convention,
+  then reduced 10% on user review). This model's raw axes differ from the Kar98K's (barrel along
+  local Y, not X) — permuted via a proper rotation (no mirroring) to match the Kar98K's axis
+  convention before reusing its exact `[75, 90, 0]` display rotation and the closed-form translation
+  formula from `docs/blockbench-reference/obj3_weapon_import_playbook.md`. First of the 7
+  newly-downloaded TastyTony models to go through the pipeline (musket/Springfield/Karabiner
+  memava-pack models dropped for quality — see `TestWeapons.kt`/`DevLoadout.kt`).
 
 ## US M1918 Mk1 trench knife (`assets/morellia/models/item/us_trench_knife.json`, `.../us_trench_knife.png`)
 

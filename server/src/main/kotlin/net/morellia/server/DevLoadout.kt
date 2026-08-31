@@ -8,6 +8,7 @@ import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
 import net.minestom.server.item.component.CustomModelData
+import net.minestom.server.timer.TaskSchedule
 
 /**
  * Local playtesting only: hands every real (non-bot) player a full weapons loadout on every
@@ -25,8 +26,6 @@ object DevLoadout {
             if (botNameRegex.matches(player.username)) return@addListener
 
             val inventory = player.inventory
-            inventory.setItemStack(0, TestWeapons.musket.setAmmo(TestWeapons.musket.toItemStack(), TestWeapons.musket.magazineSize))
-            inventory.setItemStack(1, TestWeapons.musketBall.toItemStack().withAmount(32))
             inventory.setItemStack(2, TestWeapons.bayonet.toItemStack())
             inventory.setItemStack(
                 3,
@@ -58,16 +57,6 @@ object DevLoadout {
                 TestWeapons.tommyGun.setAmmo(TestWeapons.tommyGun.toItemStack(), TestWeapons.tommyGun.magazineSize),
             )
             inventory.setItemStack(17, TestWeapons.tommyGunMagazine.toItemStack().withAmount(4))
-            inventory.setItemStack(
-                18,
-                TestWeapons.springfield.setAmmo(TestWeapons.springfield.toItemStack(), TestWeapons.springfield.magazineSize),
-            )
-            inventory.setItemStack(19, TestWeapons.springfieldRound.toItemStack().withAmount(20))
-            inventory.setItemStack(
-                20,
-                TestWeapons.karabiner.setAmmo(TestWeapons.karabiner.toItemStack(), TestWeapons.karabiner.magazineSize),
-            )
-            inventory.setItemStack(21, TestWeapons.karabinerRound.toItemStack().withAmount(20))
 
             // TEMP: raw obj³ export visual check for the Kar98k import (see docs/HANDOFF.md's
             // 2026-08-30 status update) -- not a real Gun yet, just an iron_ingot carrying the
@@ -82,6 +71,24 @@ object DevLoadout {
                 println("[DevLoadout] kar98k test item set for ${player.username}: $testStack")
             } catch (e: Exception) {
                 println("[DevLoadout] FAILED to set kar98k test item for ${player.username}: ${e.stackTraceToString()}")
+            }
+
+            // TEMP: raw obj³ export visual check for the Lebel M1886 import (first of the newly
+            // downloaded TastyTony models, see docs/HANDOFF.md). Not a real Gun yet, just an
+            // iron_ingot carrying the custom_model_data string the export's item override matches
+            // on. Remove once the model/pose is confirmed and wired into the real pipeline.
+            try {
+                val testStack =
+                    ItemStack.of(Material.IRON_INGOT)
+                        .with(
+                            DataComponents.CUSTOM_MODEL_DATA,
+                            CustomModelData(listOf(), listOf(), listOf("lebel_m1886_import"), listOf()),
+                        )
+                        .with(DataComponents.ITEM_NAME, Component.text("LEBEL M1886 TEST", NamedTextColor.RED))
+                inventory.setItemStack(23, testStack)
+                println("[DevLoadout] lebel_m1886_import test item set for ${player.username}: $testStack")
+            } catch (e: Exception) {
+                println("[DevLoadout] FAILED to set lebel_m1886_import test item for ${player.username}: ${e.stackTraceToString()}")
             }
         }
     }

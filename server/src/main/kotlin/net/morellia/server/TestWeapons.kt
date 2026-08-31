@@ -30,44 +30,6 @@ private val wildernessOrWarzoneOnly: (Instance, Pos) -> Boolean = { _, pos ->
 // unbalanced guesses -- just enough to exercise fire/reload/melee/ADS end-to-end locally. See
 // docs/research-todo/10-asset-sourcing-and-licensing.md for the asset-sourcing plan.
 object TestWeapons {
-    val musketBall =
-        Ammo(
-            name = "musket_ball",
-            ammoType = AmmoType.RIFLE,
-            itemName = Component.text("Musket Ball"),
-        )
-
-    val musket =
-        Gun(
-            name = "musket",
-            itemName = Component.text("Musket"),
-            // Mosin Nagant model from the MIT-licensed "WWI & WWII rifles" pack -- see
-            // resourcepack/CREDITS.md. Only a bare model right now (no separate empty/reloading/
-            // aiming variants -- the pack has fire/bayonet/sniper variants we could map to those
-            // later, e.g. mosinchb.json for a fixed-bayonet look).
-            // NB: item_model resolves to an *item definition* (assets/<ns>/items/<id>.json), which
-            // in turn references the raw model -- it does not point at the raw model directly. This
-            // value is the definition's id ("musket"), not the model's path ("item/musket").
-            itemModel = "morellia:musket",
-            itemModelAiming = "morellia:musket-aiming",
-            ammo = musketBall,
-            magazineSize = 1,
-            damageFalloff =
-                DamageFalloff(
-                    maxDamage = 12f,
-                    falloffStartRange = 20.0,
-                    falloffEndRange = 80.0,
-                    minDamage = 4f,
-                ),
-            automatic = false,
-            cooldownMs = 2500,
-            reloadMs = 3000,
-            recoilMin = 2f,
-            recoilMax = 4f,
-            spreadMin = 0.5f,
-            spreadMax = 2f,
-        )
-
     val bayonet =
         Melee(
             name = "bayonet",
@@ -238,57 +200,6 @@ object TestWeapons {
             spreadMax = 4f,
         )
 
-    val springfieldRound =
-        Ammo(
-            name = "springfield_round",
-            ammoType = AmmoType.RIFLE,
-            itemName = Component.text("Springfield Round"),
-        )
-
-    // Real Springfield/Kar98k model from the "WWI & WWII rifles" pack -- see resourcepack/CREDITS.md.
-    val springfield =
-        Gun(
-            name = "springfield",
-            itemName = Component.text("Springfield"),
-            itemModel = "morellia:springfield",
-            itemModelAiming = "morellia:springfield-aiming",
-            ammo = springfieldRound,
-            magazineSize = 5,
-            damageFalloff = DamageFalloff(maxDamage = 12f, falloffStartRange = 20.0, falloffEndRange = 80.0, minDamage = 4f),
-            automatic = false,
-            cooldownMs = 1200,
-            reloadMs = 2500,
-            recoilMin = 2f,
-            recoilMax = 4f,
-            spreadMin = 0.5f,
-            spreadMax = 2f,
-        )
-
-    val karabinerRound =
-        Ammo(
-            name = "karabiner_round",
-            ammoType = AmmoType.RIFLE,
-            itemName = Component.text("Karabiner Round"),
-        )
-
-    val karabiner =
-        Gun(
-            name = "karabiner",
-            itemName = Component.text("Karabiner"),
-            itemModel = "morellia:karabiner",
-            itemModelAiming = "morellia:karabiner-aiming",
-            ammo = karabinerRound,
-            magazineSize = 5,
-            damageFalloff = DamageFalloff(maxDamage = 12f, falloffStartRange = 20.0, falloffEndRange = 80.0, minDamage = 4f),
-            automatic = false,
-            cooldownMs = 1200,
-            reloadMs = 2500,
-            recoilMin = 2f,
-            recoilMax = 4f,
-            spreadMin = 0.5f,
-            spreadMax = 2f,
-        )
-
     // Placeholder bayonet models stand in for these -- see resourcepack/CREDITS.md, the pack has no
     // standalone trench-knife assets.
     val usTrenchKnife =
@@ -320,10 +231,9 @@ object TestWeapons {
 
     fun register() {
         Item.registerItems(
-            musketBall, musket, bayonet, artilleryShell, fieldGun, shotgunShell, shotgun,
+            bayonet, artilleryShell, fieldGun, shotgunShell, shotgun,
             m1911Round, m1911, mauserC96Round, mauserC96,
             mp18Magazine, mp18, tommyGunMagazine, tommyGun,
-            springfieldRound, springfield, karabinerRound, karabiner,
             usTrenchKnife, nahkampfmesser, couteauPoignard,
         )
     }
