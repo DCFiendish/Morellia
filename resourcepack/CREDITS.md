@@ -38,6 +38,38 @@ recorded here as they're added.
   newly-downloaded TastyTony models to go through the pipeline (musket/Springfield/Karabiner
   memava-pack models dropped for quality — see `TestWeapons.kt`/`DevLoadout.kt`).
 
+## Fedorov Avtomat, Mossberg Patriot, SKS, Springfield 1873, VPO-102, Beretta Model 57 (exported via obj³)
+
+- **Source**: TastyTony, same "Low-Poly Rifles" Sketchfab series as the Kar98K/Lebel M1886 above
+  (`low-poly_federov_avtomat.glb`, `low-poly_mossberg_patriot.glb`, `low-poly_sks.glb`,
+  `low-poly_springfield_model_1873.glb`, `low-poly_vpo-102.glb`, `low-poly_beretta_model_57.glb` —
+  exact per-model Sketchfab URLs not recorded, pulled into `Downloaded glb assets/` before this
+  session; fill in if/when re-sourced).
+- **License**: CC-BY 4.0 assumed (same creator/series as the Kar98K/Lebel M1886, attribution
+  required — credit TastyTony wherever these assets are credited publicly). Verify per-model before
+  shipping publicly.
+- **Pulled/processed**: 2026-09-01
+- **Notes**: all six run through the same obj³ pipeline as the Kar98K/Lebel M1886 (see
+  `docs/blockbench-reference/obj3_weapon_import_playbook.md`), rebuilt directly from each raw glTF's
+  `matrixWorld` (bypassing Blockbench's native importer — same scale bug family, see
+  `docs/blockbench-reference/gltf_import_scale_bug.md`) rather than checked file-by-file for which
+  nodes are affected. Colors sourced from each model's own materials, not guessed: Springfield 1873
+  used the deprecated `KHR_materials_pbrSpecularGlossiness` extension (diffuseFactor extracted and
+  gamma-corrected, same as the Kar98K); the other five used standard
+  `pbrMetallicRoughness.baseColorFactor`, read directly off the Three.js-parsed material with no
+  extra correction needed. Each model's raw barrel axis was detected per-file and permuted onto the
+  Kar98K's local-X convention with a proper (non-mirroring) rotation before reusing its exact
+  `[75, 90, 0]` third-person display rotation and closed-form translation formula. Grip point
+  (local origin) placed at each model's trigger-guard cluster, found by geometry (lowest-Y vertices
+  in the receiver region) and confirmed with a marker-cube screenshot per model, not by eye alone.
+  Scaled per-model off estimated real-world lengths against the Kar98K's ~41-unit convention (SMG
+  and rifle lengths only, not measured precisely). "Beretta Model 57" is visually an M12-style
+  submachine gun with a wood stock and stick magazine, not the historical semi-auto pistol the name
+  suggests — treated as a two-handed long gun like the rest of this batch, not a pistol grip.
+  **Verified in Blockbench only** (silhouette, color, and grip-marker screenshots per model) — none
+  of these six have been checked against the real Minecraft client yet; do that before wiring any of
+  them into `TestWeapons.kt` for real.
+
 ## US M1918 Mk1 trench knife (`assets/morellia/models/item/us_trench_knife.json`, `.../us_trench_knife.png`)
 
 - **Source**: same pack (memava's "WWI & WWII rifles", v8.5), MIT license.

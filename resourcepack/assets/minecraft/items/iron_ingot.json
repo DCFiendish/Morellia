@@ -198,6 +198,588 @@
             ]
           }
         }
+      },
+      {
+        "when": "federov_avtomat",
+        "model": {
+          "type": "minecraft:select",
+          "property": "minecraft:display_context",
+          "cases": [
+            {
+              "when": "thirdperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/federov_avtomat_thirdperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "thirdperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/federov_avtomat_thirdperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/federov_avtomat_firstperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/federov_avtomat_firstperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "ground",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/federov_avtomat_ground",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "on_shelf",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/federov_avtomat_on_shelf",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            }
+          ],
+          "fallback": {
+            "type": "minecraft:model",
+            "model": "objcubed:item/federov_avtomat_default",
+            "tints": [
+              {
+                "type": "minecraft:potion",
+                "default": -1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "when": "mossberg_patriot",
+        "model": {
+          "type": "minecraft:select",
+          "property": "minecraft:display_context",
+          "cases": [
+            {
+              "when": "thirdperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/mossberg_patriot_thirdperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "thirdperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/mossberg_patriot_thirdperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/mossberg_patriot_firstperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/mossberg_patriot_firstperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "ground",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/mossberg_patriot_ground",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "on_shelf",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/mossberg_patriot_on_shelf",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            }
+          ],
+          "fallback": {
+            "type": "minecraft:model",
+            "model": "objcubed:item/mossberg_patriot_default",
+            "tints": [
+              {
+                "type": "minecraft:potion",
+                "default": -1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "when": "sks",
+        "model": {
+          "type": "minecraft:select",
+          "property": "minecraft:display_context",
+          "cases": [
+            {
+              "when": "thirdperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/sks_thirdperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "thirdperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/sks_thirdperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/sks_firstperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/sks_firstperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "ground",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/sks_ground",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "on_shelf",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/sks_on_shelf",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            }
+          ],
+          "fallback": {
+            "type": "minecraft:model",
+            "model": "objcubed:item/sks_default",
+            "tints": [
+              {
+                "type": "minecraft:potion",
+                "default": -1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "when": "springfield_1873",
+        "model": {
+          "type": "minecraft:select",
+          "property": "minecraft:display_context",
+          "cases": [
+            {
+              "when": "thirdperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/springfield_1873_thirdperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "thirdperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/springfield_1873_thirdperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/springfield_1873_firstperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/springfield_1873_firstperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "ground",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/springfield_1873_ground",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "on_shelf",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/springfield_1873_on_shelf",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            }
+          ],
+          "fallback": {
+            "type": "minecraft:model",
+            "model": "objcubed:item/springfield_1873_default",
+            "tints": [
+              {
+                "type": "minecraft:potion",
+                "default": -1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "when": "vpo102",
+        "model": {
+          "type": "minecraft:select",
+          "property": "minecraft:display_context",
+          "cases": [
+            {
+              "when": "thirdperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/vpo102_thirdperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "thirdperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/vpo102_thirdperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/vpo102_firstperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/vpo102_firstperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "ground",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/vpo102_ground",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "on_shelf",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/vpo102_on_shelf",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            }
+          ],
+          "fallback": {
+            "type": "minecraft:model",
+            "model": "objcubed:item/vpo102_default",
+            "tints": [
+              {
+                "type": "minecraft:potion",
+                "default": -1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "when": "beretta_57",
+        "model": {
+          "type": "minecraft:select",
+          "property": "minecraft:display_context",
+          "cases": [
+            {
+              "when": "thirdperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/beretta_57_thirdperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "thirdperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/beretta_57_thirdperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_righthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/beretta_57_firstperson_righthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "firstperson_lefthand",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/beretta_57_firstperson_lefthand",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "ground",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/beretta_57_ground",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            },
+            {
+              "when": "on_shelf",
+              "model": {
+                "type": "minecraft:model",
+                "model": "objcubed:item/beretta_57_on_shelf",
+                "tints": [
+                  {
+                    "type": "minecraft:potion",
+                    "default": -1
+                  }
+                ]
+              }
+            }
+          ],
+          "fallback": {
+            "type": "minecraft:model",
+            "model": "objcubed:item/beretta_57_default",
+            "tints": [
+              {
+                "type": "minecraft:potion",
+                "default": -1
+              }
+            ]
+          }
+        }
       }
     ],
     "fallback": {

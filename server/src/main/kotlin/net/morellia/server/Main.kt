@@ -6,6 +6,7 @@ import net.aechronis.utils.createTestServer
 import net.aechronis.vanilla.Vanilla
 import net.aechronis.vanilla.VanillaConfig
 import net.minestom.server.Auth
+import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.Pos
 import net.morellia.combat.Combat
 
@@ -40,6 +41,7 @@ fun main() {
     TickMonitor.init()
     LoadTestBots.init()
     DevLoadout.init()
+    MinecraftServer.getCommandManager().register(TestGunGive())
     TestMeleeTarget.spawn(instance, spawnPoint)
     // Testing-only: enable war at boot so bot swarms don't need a human to run
     // /nodesadmin war enable first. Remove alongside LoadTestBots once real players take over.
