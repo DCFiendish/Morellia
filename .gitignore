@@ -9,3 +9,15 @@ desktop.ini
 /.gradle/
 /.kotlin/
 /modules/build/
+
+# Map-generation scratch output (heightmaps, .tif, region exports) -- regenerable from source
+# inputs, not deliverables, and too large to be worth tracking (~430MB).
+/tools/agadir-mapgen/agadir-*.tif
+/tools/agadir-mapgen/agadir-*.png
+/tools/agadir-mapgen/test-crop-*
+/tools/agadir-mapgen/*-world-export*/
+/tools/agadir-mapgen/test-map-export/
+
+# Raw third-party downloads and local backup copies -- not source, not tracked.
+/Downloaded glb assets/
+*.bak
