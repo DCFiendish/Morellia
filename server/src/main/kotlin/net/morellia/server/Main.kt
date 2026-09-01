@@ -29,6 +29,9 @@ fun main() {
     )
     AgadirWorld.attach(instance)
     instance.setChunkSupplier(::FullbrightChunk)
+    // TODO(pvp playtest): warpsConfig.warps and pvpPrepConfig.zones are empty by default (same as
+    // kothsConfig above them) -- add real WarpPoint/PrepZoneConfig entries here, each referencing
+    // `instance`, once the warp landing spots and their no-damage/no-break box corners are picked.
     Vanilla.init(VanillaConfig(path = "morellia-data/vanilla"))
     // Testing-only: cut capture time way down so siege tests don't take forever. Both test
     // territories are wilderness-bordering AND each town's home, so wasteland (2x) and home (2x)
@@ -40,9 +43,10 @@ fun main() {
     ResourcePack.init()
     TickMonitor.init()
     LoadTestBots.init()
-    DevLoadout.init()
+    PvpKit.init()
     MinecraftServer.getCommandManager().register(TestGunGive())
     MinecraftServer.getCommandManager().register(SourceCommand())
+    MinecraftServer.getCommandManager().register(KitCommand())
     TestMeleeTarget.spawn(instance, spawnPoint)
     // Testing-only: enable war at boot so bot swarms don't need a human to run
     // /nodesadmin war enable first. Remove alongside LoadTestBots once real players take over.

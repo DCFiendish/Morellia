@@ -18,7 +18,9 @@ import net.aechronis.vanilla.commands.List
 import net.aechronis.vanilla.commands.Message
 import net.aechronis.vanilla.commands.Music
 import net.aechronis.vanilla.commands.Reply
+import net.aechronis.vanilla.commands.SetWarpCommand
 import net.aechronis.vanilla.commands.Teleport
+import net.aechronis.vanilla.commands.WarpCommand
 import net.aechronis.vanilla.commands.Whitelist
 import net.aechronis.vanilla.listeners.BlockPlacementCooldownListener
 import net.aechronis.vanilla.listeners.CombatInventoryListener
@@ -38,10 +40,12 @@ import net.aechronis.vanilla.managers.Items
 import net.aechronis.vanilla.managers.Koth
 import net.aechronis.vanilla.managers.Mannequin
 import net.aechronis.vanilla.managers.PlayerData
+import net.aechronis.vanilla.managers.PvpPrep
 import net.aechronis.vanilla.managers.Recipes
 import net.aechronis.vanilla.managers.Saplings
 import net.aechronis.vanilla.managers.Storage
 import net.aechronis.vanilla.managers.TreeFeller
+import net.aechronis.vanilla.managers.Warp
 import net.minestom.server.MinecraftServer
 import net.minestom.server.event.EventNode
 import java.nio.file.Path
@@ -84,6 +88,7 @@ object Vanilla {
             if (config.recipesEnabled) commands += Craft()
             if (config.whitelistEnabled) commands += Whitelist()
             if (config.kothEnabled) commands += KothCommand()
+            if (config.warpEnabled) commands += listOf(WarpCommand(), SetWarpCommand())
             MinecraftServer.getCommandManager().register(*commands.toTypedArray())
         }
         println("Loading Vanilla")
@@ -113,6 +118,8 @@ object Vanilla {
         }
         if (config.musicEnabled) MusicManager.init()
         if (config.kothEnabled) Koth.init()
+        if (config.warpEnabled) Warp.init(Path.of(config.path, config.warpsPath))
+        if (config.pvpPrepEnabled) PvpPrep.init()
 
         Runtime.getRuntime().addShutdownHook(
             Thread({

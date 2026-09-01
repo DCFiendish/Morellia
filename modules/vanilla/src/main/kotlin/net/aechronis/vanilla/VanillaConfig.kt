@@ -4,7 +4,9 @@ import net.aechronis.vanilla.config.BlocksConfig
 import net.aechronis.vanilla.config.FoodConfig
 import net.aechronis.vanilla.config.KothsConfig
 import net.aechronis.vanilla.config.MusicConfig
+import net.aechronis.vanilla.config.PvpPrepConfig
 import net.aechronis.vanilla.config.RecipesConfig
+import net.aechronis.vanilla.config.WarpsConfig
 
 data class VanillaConfig(
     // Feature toggles
@@ -31,6 +33,8 @@ data class VanillaConfig(
     val musicEnabled: Boolean = true,
     val spawnEnabled: Boolean = true,
     val kothEnabled: Boolean = true,
+    val warpEnabled: Boolean = true,
+    val pvpPrepEnabled: Boolean = true,
     val movementAntiCheatEnabled: Boolean = true,
     val blockPlacementCooldownEnabled: Boolean = true,
     // Paths
@@ -39,6 +43,7 @@ data class VanillaConfig(
     val storagePath: String = "storage",
     val whitelistPath: String = "whitelist.json",
     val spawnPath: String = "spawn",
+    val warpsPath: String = "warps.json",
     // Blocks
     val blocksConfig: BlocksConfig = BlocksConfig(),
     // Food
@@ -49,6 +54,10 @@ data class VanillaConfig(
     val recipesConfig: RecipesConfig = RecipesConfig(),
     // koths
     val kothsConfig: KothsConfig = KothsConfig(),
+    // warps
+    val warpsConfig: WarpsConfig = WarpsConfig(),
+    // pvp prep zones (no-damage/no-break boxes around warp landing spots)
+    val pvpPrepConfig: PvpPrepConfig = PvpPrepConfig(),
     // Crops
     val cropGrowthCheckSeconds: Long = 20L,
     val wheatMsPerStage: Long = 72_000L,

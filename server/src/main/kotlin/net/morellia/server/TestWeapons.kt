@@ -2,6 +2,7 @@ package net.morellia.server
 
 import net.aechronis.nodes.objects.Territory
 import net.aechronis.nodes.objects.TerritoryChunk
+import net.aechronis.vanilla.managers.PvpPrep
 import net.kyori.adventure.text.Component
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.instance.Instance
@@ -24,6 +25,13 @@ private val wildernessOrWarzoneOnly: (Instance, Pos) -> Boolean = { _, pos ->
     val chunk = TerritoryChunk.fromBlock(pos.blockX(), pos.blockZ())
     territory?.town == null || chunk?.attacker != null
 }
+
+/**
+ * Pvp-playtest guard: a gun carrying this in usableZones simply won't fire inside a configured
+ * PvpPrep box (see VanillaConfig.pvpPrepConfig) -- the actual no-damage rule is enforced
+ * separately by PvpPrepListener's EntityDamageEvent cancel, this only stops wasted shots/ammo.
+ */
+private val outsidePvpPrepZone: (Instance, Pos) -> Boolean = { instance, pos -> !PvpPrep.isInside(instance, pos) }
 
 // Placeholder musket-era test weapons for combat testing, backed by the from-scratch
 // modules/combat (replacing the old net.aechronis.combat-based stub -- see docs/HANDOFF.md). No
@@ -265,6 +273,7 @@ object TestWeapons {
             // Bolt-action: pinpoint standing/crouched (spreadSuppressed in Gun.fire), basically
             // unusable walking, and unusable even point-blank sprinting -- stop to actually land a hit.
             sprintSpreadMultiplier = 2.5f,
+            usableZones = listOf(outsidePvpPrepZone),
         )
 
     fun register() {
