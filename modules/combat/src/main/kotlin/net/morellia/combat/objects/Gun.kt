@@ -139,18 +139,26 @@ class Gun(
                 aiming -> itemModelAiming
                 else -> itemModel
             }
-        if (targetItemModel != null) updated = updated.with(DataComponents.ITEM_MODEL, targetItemModel)
+        // Compared against the stack's current component before calling .with() -- .with() always
+        // allocates a new ItemStack even when the resulting data is identical, and this runs every
+        // tick (ModelRefreshTask) for every gun-holding player, so skipping the call entirely on the
+        // (overwhelmingly common) no-change tick avoids that allocation instead of just discarding it
+        // afterward. Network-wise this was already harmless either way -- Minestom's own
+        // AbstractInventory.setItemStack does an ItemStack.equals() check before sending anything --
+        // but there's no reason to pay the allocation for a result that gets thrown away.
+        if (targetItemModel != null && targetItemModel != stack.get(DataComponents.ITEM_MODEL)) {
+            updated = updated.with(DataComponents.ITEM_MODEL, targetItemModel)
+        }
 
         // obj³-pipeline guns select their baked model via custom_model_data instead of item_model
         // (see Item's customModelData kdoc) -- independent of the swap above, a gun can use either
         // path, both, or neither.
         val targetCustomModelData = if (aiming) customModelDataAiming else customModelData
         if (targetCustomModelData != null) {
-            updated =
-                updated.with(
-                    DataComponents.CUSTOM_MODEL_DATA,
-                    CustomModelData(listOf(), listOf(), listOf(targetCustomModelData), listOf()),
-                )
+            val newComponent = CustomModelData(listOf(), listOf(), listOf(targetCustomModelData), listOf())
+            if (newComponent != stack.get(DataComponents.CUSTOM_MODEL_DATA)) {
+                updated = updated.with(DataComponents.CUSTOM_MODEL_DATA, newComponent)
+            }
         }
 
         if (updated !== stack) player.itemInMainHand = updated
