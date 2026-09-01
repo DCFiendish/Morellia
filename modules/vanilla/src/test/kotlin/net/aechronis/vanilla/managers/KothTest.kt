@@ -37,4 +37,26 @@ class KothTest : ManagerTest() {
         assertNull(state.captureStartedAt)
         VanillaTest.remove(player)
     }
+
+    @Test
+    fun `boss bar visibility stays limited to nearby players`() {
+        val name = "bossbar-radius-${System.nanoTime()}"
+        val config = KothConfig(name, VanillaTest.instance, BlockVec(0, 40, 0), BlockVec(2, 42, 2), 10)
+        val state = Koth.ActiveKoth(config, 0L, 10_000L)
+        val nearby = VanillaTest.createPlayer(Pos(0.5, 40.0, 0.5))
+        val distant = VanillaTest.createPlayer(Pos(2_000.5, 40.0, 2_000.5))
+
+        Koth.active[name] = state
+        try {
+            Koth.updateBossBarsFor(nearby, now = 0L)
+            Koth.updateBossBarsFor(distant, now = 0L)
+
+            assertTrue(nearby.uuid in state.visibleTo)
+            assertFalse(distant.uuid in state.visibleTo)
+        } finally {
+            Koth.active.remove(name)
+            VanillaTest.remove(nearby)
+            VanillaTest.remove(distant)
+        }
+    }
 }

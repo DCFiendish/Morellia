@@ -21,6 +21,7 @@ import net.aechronis.vanilla.commands.Reply
 import net.aechronis.vanilla.commands.Teleport
 import net.aechronis.vanilla.commands.Whitelist
 import net.aechronis.vanilla.listeners.BlockPlacementCooldownListener
+import net.aechronis.vanilla.listeners.CombatInventoryListener
 import net.aechronis.vanilla.listeners.CommandsListener
 import net.aechronis.vanilla.listeners.FallDamageListener
 import net.aechronis.vanilla.listeners.MovementAntiCheatListener
@@ -106,7 +107,10 @@ object Vanilla {
         if (config.blockPlacementCooldownEnabled) BlockPlacementCooldownListener.init()
         if (config.fireDamageEnabled || config.drowningEnabled) EnvironmentalDamage.init()
         if (config.serverLinksEnabled) ServerLinksListener.init()
-        if (config.combatEnabled) Combat.init()
+        if (config.combatEnabled) {
+            Combat.init()
+            CombatInventoryListener.init()
+        }
         if (config.musicEnabled) MusicManager.init()
         if (config.kothEnabled) Koth.init()
 

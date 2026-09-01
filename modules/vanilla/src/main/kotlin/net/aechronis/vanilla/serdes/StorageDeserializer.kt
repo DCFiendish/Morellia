@@ -1,5 +1,6 @@
 package net.aechronis.vanilla.serdes
 
+import net.aechronis.vanilla.managers.Bundles
 import net.aechronis.vanilla.objects.StorageContents
 import net.kyori.adventure.nbt.CompoundBinaryTag
 import net.kyori.adventure.nbt.ListBinaryTag
@@ -30,7 +31,8 @@ object StorageDeserializer {
                     itemBuilder.put(key, entry.get(key)!!)
                 }
             }
-            val item = ItemStack.fromItemNBT(itemBuilder.build())
+            val item = runCatching { ItemStack.fromItemNBT(itemBuilder.build()) }.getOrNull() ?: continue
+            if (!Bundles.isSafeForTransport(item)) continue
             inventory.setItemStack(slot.toInt(), item)
         }
     }

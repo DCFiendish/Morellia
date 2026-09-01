@@ -11,6 +11,7 @@ import net.kyori.adventure.nbt.BinaryTagTypes
 import net.kyori.adventure.nbt.ListBinaryTag
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.Point
+import net.minestom.server.entity.Player
 import net.minestom.server.instance.Chunk
 import net.minestom.server.instance.Instance
 import net.minestom.server.instance.block.Block
@@ -23,6 +24,11 @@ import java.nio.file.StandardCopyOption
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
+enum class StorageAccess {
+    INTERACT,
+    BREAK,
+}
+
 object Storage {
     val barrels = ConcurrentHashMap<BlockKey, StorageContents>()
     val inventoryToKey = ConcurrentHashMap<Inventory, BlockKey>()
@@ -33,6 +39,22 @@ object Storage {
             override fun getKey(): Key = barrelKey
         }
     private var legacyRoot: Path? = null
+
+    // Vanilla has no notion of claims/permissions on its own -- Nodes wires this up via
+    // NodesVanillaStorageBridge so barrels respect town ownership. Without a checker installed,
+    // storage is unrestricted (matches vanilla behavior when Nodes isn't loaded).
+    @Volatile
+    private var accessChecker: ((Player, Point, StorageAccess) -> Boolean)? = null
+
+    fun setAccessChecker(checker: ((Player, Point, StorageAccess) -> Boolean)?) {
+        accessChecker = checker
+    }
+
+    fun hasAccess(
+        player: Player,
+        position: Point,
+        access: StorageAccess,
+    ): Boolean = accessChecker?.invoke(player, position, access) ?: true
 
     fun init(legacyRoot: Path) {
         val timeStart = System.currentTimeMillis()

@@ -1,5 +1,6 @@
 package net.aechronis.vanilla.serdes
 
+import net.aechronis.vanilla.managers.Bundles
 import net.aechronis.vanilla.managers.Commands
 import net.kyori.adventure.nbt.BinaryTagTypes
 import net.kyori.adventure.nbt.CompoundBinaryTag
@@ -35,7 +36,12 @@ object PlayerDataDeserializer {
         deserializeInventory(player.inventory, data.getList("Inventory"))
         deserializeInventory(Commands.getEnderChest(player), data.getList("EnderChest"))
         val cursorItem = data.getCompound("CursorItem")
-        if (cursorItem.keySet().isNotEmpty()) player.inventory.cursorItem = ItemStack.fromItemNBT(cursorItem)
+        if (cursorItem.keySet().isNotEmpty()) {
+            runCatching { ItemStack.fromItemNBT(cursorItem) }
+                .getOrNull()
+                ?.takeIf(Bundles::isSafeForTransport)
+                ?.let { player.inventory.cursorItem = it }
+        }
 
         val ignoredList = data.getList("Ignored", BinaryTagTypes.STRING)
         if (ignoredList.size() > 0) {
@@ -83,7 +89,8 @@ object PlayerDataDeserializer {
                     itemBuilder.put(key, entry.get(key)!!)
                 }
             }
-            val item = ItemStack.fromItemNBT(itemBuilder.build())
+            val item = runCatching { ItemStack.fromItemNBT(itemBuilder.build()) }.getOrNull() ?: continue
+            if (!Bundles.isSafeForTransport(item)) continue
             target.setItemStack(slot.toInt(), item)
         }
     }

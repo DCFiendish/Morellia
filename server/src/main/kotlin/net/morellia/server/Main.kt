@@ -42,6 +42,7 @@ fun main() {
     LoadTestBots.init()
     DevLoadout.init()
     MinecraftServer.getCommandManager().register(TestGunGive())
+    MinecraftServer.getCommandManager().register(SourceCommand())
     TestMeleeTarget.spawn(instance, spawnPoint)
     // Testing-only: enable war at boot so bot swarms don't need a human to run
     // /nodesadmin war enable first. Remove alongside LoadTestBots once real players take over.

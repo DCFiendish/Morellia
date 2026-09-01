@@ -26,6 +26,7 @@ import net.aechronis.nodes.listeners.NodesPlayerDamageListener
 import net.aechronis.nodes.listeners.NodesPlayerJoinQuitListener
 import net.aechronis.nodes.listeners.NodesPlayerMoveListener
 import net.aechronis.nodes.listeners.NodesPlotSelectionListener
+import net.aechronis.nodes.listeners.NodesVanillaStorageBridge
 import net.aechronis.nodes.listeners.NodesWorldListener
 import net.aechronis.nodes.objects.Building
 import net.aechronis.nodes.objects.Coord
@@ -142,6 +143,7 @@ object Nodes {
         NodesPlayerMoveListener.init()
         NodesPlotSelectionListener.init()
         NodesWorldListener.init()
+        NodesVanillaStorageBridge.init()
         WaypointMenu.init()
         MinecraftServer.getSchedulerManager().buildShutdownTask { cleanup() }
         MinecraftServer.getCommandManager().register(TownCommand())

@@ -240,7 +240,6 @@ object TreeFeller {
                 )
         if (ordered.isEmpty()) return
 
-        val logMaterial = logBlock.registry()?.material()
         val saplingMaterial = saplingMaterial(logBlock)
         val perTick = Vanilla.config.treeFellerBlocksPerTick.coerceAtLeast(1)
         val interval = Vanilla.config.treeFellerTickInterval.coerceAtLeast(1)
@@ -257,14 +256,16 @@ object TreeFeller {
                 // above stays synchronous (pure local state, no instance access), only the actual
                 // block read/mutation/drop defers onto the owning instance's tick thread.
                 instance.scheduleNextTick {
-                    val stateId = instance.getBlock(x, y, z).stateId()
+                    val current = instance.getBlock(x, y, z)
                     instance.setBlock(x, y, z, Block.AIR)
                     instance
                         .getChunk(x shr 4, z shr 4)
                         ?.sendPacketToViewers(
-                            WorldEventPacket(2001, BlockVec(x, y, z), stateId, false),
+                            WorldEventPacket(2001, BlockVec(x, y, z), current.stateId(), false),
                         )
-                    val drops = if (leaf) rollLeafDrop(saplingMaterial) else logMaterial?.let { listOf(ItemStack.of(it)) }
+                    // Drops the actual block that was standing there (e.g. a stripped log mixed
+                    // into an otherwise-regular tree), not whatever variant was originally clicked.
+                    val drops = if (leaf) rollLeafDrop(saplingMaterial) else current.registry()?.material()?.let { listOf(ItemStack.of(it)) }
                     if (!drops.isNullOrEmpty()) {
                         val dropPos = Pos(x + 0.5, y + 0.5, z + 0.5)
                         for (stack in drops) Items.spawn(instance, dropPos, stack)
