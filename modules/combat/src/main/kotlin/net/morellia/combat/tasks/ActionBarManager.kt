@@ -46,13 +46,19 @@ object ActionBarManager {
         player.sendActionBar(text)
     }
 
-    /** 0.0-1.0 fraction of the way from "just fired" to "can fire again", or null once the cooldown's elapsed. */
+    /**
+     * 0.0-1.0 fraction of the way from "just fired" to "can fire again", or null once the cooldown's
+     * elapsed -- also null if the last recorded shot was from a *different* gun than the one
+     * currently held (e.g. right after a weapon swap), matching the same per-gun cooldown scoping
+     * Gun.fire itself enforces.
+     */
     private fun cooldownProgress(
         player: Player,
         gun: Gun,
     ): Double? {
         val lastFire = Combat.playerLastFireTimes[player] ?: return null
-        val elapsed = System.currentTimeMillis() - lastFire
+        if (lastFire.first !== gun) return null
+        val elapsed = System.currentTimeMillis() - lastFire.second
         if (elapsed >= gun.cooldownMs) return null
         return elapsed.toDouble() / gun.cooldownMs
     }

@@ -188,7 +188,8 @@ class Gun(
     fun fire(player: Player): Boolean {
         val instance = player.instance ?: return false
         val now = System.currentTimeMillis()
-        if (now - (Combat.playerLastFireTimes[player] ?: 0L) < cooldownMs) return false
+        val lastFire = Combat.playerLastFireTimes[player]
+        if (lastFire != null && lastFire.first === this && now - lastFire.second < cooldownMs) return false
         if (Combat.reloadTasks.containsKey(player)) return false
 
         val stack = player.itemInMainHand
@@ -198,7 +199,7 @@ class Gun(
         }
         if (usableZones.isNotEmpty() && usableZones.none { it(instance, player.position) }) return false
 
-        Combat.playerLastFireTimes[player] = now
+        Combat.playerLastFireTimes[player] = this to now
 
         val crouching = player in Combat.aimingPlayers
         val moving = player in Combat.movingPlayers
@@ -207,7 +208,11 @@ class Gun(
         val spreadMultiplier = if (sprinting) sprintSpreadMultiplier else 1f
         val recoilMultiplier = if (crouching) AIM_RECOIL_MULTIPLIER else 1f
 
-        val potentialTargets = instance.entities.filterIsInstance<LivingEntity>().filter { it != player }
+        // Range-bounded via Minestom's chunk-indexed EntityTracker, not a full instance.entities scan
+        // -- this runs on every trigger pull (up to several times/sec for an automatic gun), so
+        // scanning every entity in the whole instance regardless of distance is wasted work,
+        // worse the more entities/simultaneously-shooting players are around.
+        val potentialTargets = instance.getNearbyEntities(player.position, maxRange).filterIsInstance<LivingEntity>().filter { it != player }
 
         repeat(pelletCount) {
             val spreadAngle =

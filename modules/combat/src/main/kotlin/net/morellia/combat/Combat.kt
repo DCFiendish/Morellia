@@ -11,6 +11,8 @@ import net.morellia.combat.listeners.MovementListener
 import net.morellia.combat.listeners.PlayerDisconnectListener
 import net.morellia.combat.listeners.ReloadListener
 import net.morellia.combat.listeners.WeaponSwapListener
+import net.morellia.combat.objects.Gun
+import net.morellia.combat.objects.Melee
 import net.morellia.combat.tasks.ActionBarManager
 import net.morellia.combat.tasks.ModelRefreshTask
 import java.util.concurrent.ConcurrentHashMap
@@ -24,7 +26,14 @@ import java.util.concurrent.ConcurrentHashMap
 object Combat {
     val eventNode: EventNode<net.minestom.server.event.Event> = EventNode.all("combat")
 
-    internal val playerLastFireTimes = ConcurrentHashMap<Player, Long>()
+    /**
+     * Keyed by player, valued by (which Gun, when) -- not just a bare timestamp. A cooldown is only
+     * ever enforced against the *same* gun that set it (see Gun.fire/ActionBarManager); without the
+     * gun half of this pair, switching from a slow-cooldown gun to a fast one right after firing
+     * would carry the slow gun's recent timestamp over and block the fast gun from firing at all,
+     * for a weapon that was never even used yet.
+     */
+    internal val playerLastFireTimes = ConcurrentHashMap<Player, Pair<Gun, Long>>()
     internal val lastFireInputTimes = ConcurrentHashMap<Player, Long>()
     internal val autoFireTasks = ConcurrentHashMap<Player, Task>()
     internal val reloadTasks = ConcurrentHashMap<Player, Task>()
@@ -35,7 +44,8 @@ object Combat {
     internal val movingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
     /** Players currently sprinting -- see MovementListener, read by Gun.fire for the running-spread penalty. */
     internal val sprintingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
-    internal val meleeLastAttackTimes = ConcurrentHashMap<Player, Long>()
+    /** Same (which weapon, when) shape as [playerLastFireTimes], same reason -- see MeleeListener. */
+    internal val meleeLastAttackTimes = ConcurrentHashMap<Player, Pair<Melee, Long>>()
 
     fun initialize() {
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
