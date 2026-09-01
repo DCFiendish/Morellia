@@ -13,7 +13,9 @@ import net.minestom.server.entity.damage.Damage
 import net.minestom.server.instance.Instance
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
+import net.minestom.server.network.packet.server.play.ParticlePacket
 import net.minestom.server.network.packet.server.play.PlayerPositionAndLookPacket
+import net.minestom.server.particle.Particle
 import net.morellia.combat.Combat
 import net.morellia.combat.constants.Tags
 import net.morellia.combat.utils.Ray
@@ -31,6 +33,7 @@ class Gun(
     val itemModelReloading: String? = itemModel,
     val itemModelAiming: String? = itemModel,
     material: Material = Material.CROSSBOW,
+    customModelData: String? = null,
     /** Magazine item consumed 1-per-reload regardless of [magazineSize] -- see ReloadListener. */
     val ammo: Ammo,
     val magazineSize: Int,
@@ -67,7 +70,7 @@ class Gun(
      * module ever needing to depend on nodes.
      */
     val usableZones: List<(Instance, Pos) -> Boolean> = emptyList(),
-) : Item(name, itemName, itemLore, itemModel, material) {
+) : Item(name, itemName, itemLore, itemModel, material, customModelData) {
     init {
         require(magazineSize > 0) { "magazineSize must be > 0" }
         require(maxRange.isFinite() && maxRange > 0.0) { "maxRange must be a positive finite number" }
@@ -191,10 +194,28 @@ class Gun(
 
         val firePosition = player.position.add(0.0, player.eyeHeight, 0.0)
         instance.playSound(soundFire, firePosition.x, firePosition.y, firePosition.z)
+        muzzleFlash(instance, firePosition, player.position.direction())
         recoil(player, recoilMultiplier)
         player.itemInMainHand = setAmmo(stack, getAmmo(stack) - 1)
         refreshModel(player)
         return true
+    }
+
+    /**
+     * A handful of [Particle.SMOKE] puffs at the muzzle (eye position nudged forward along the
+     * shot direction), broadcast to everyone in the instance the same way [soundFire] already is.
+     * Vanilla particle with its own built-in lifetime/fade -- drifts and fades over roughly a
+     * second on its own, no manual timer needed here.
+     */
+    private fun muzzleFlash(
+        instance: Instance,
+        firePosition: Pos,
+        direction: net.minestom.server.coordinate.Vec,
+    ) {
+        val muzzle = firePosition.add(direction.mul(MUZZLE_OFFSET))
+        instance.sendGroupedPacket(
+            ParticlePacket(Particle.SMOKE, muzzle.x(), muzzle.y(), muzzle.z(), 0.05f, 0.05f, 0.05f, 0.02f, 6),
+        )
     }
 
     private fun recoil(
@@ -216,5 +237,8 @@ class Gun(
     companion object {
         /** Recoil while crouched/aiming is reduced, never eliminated -- pairs with the recoilMin > 0 guarantee. */
         private const val AIM_RECOIL_MULTIPLIER = 0.4f
+
+        /** Blocks in front of the eye the muzzle flash/smoke spawns at -- roughly barrel-tip distance. */
+        private const val MUZZLE_OFFSET = 1.2
     }
 }

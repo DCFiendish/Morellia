@@ -10,7 +10,7 @@ import net.morellia.combat.objects.Gun
 import net.morellia.combat.objects.Item
 
 private const val UPDATE_PERIOD_TICKS = 4
-private const val BAR_SEGMENTS = 20
+private const val BAR_SEGMENTS = 10
 
 /**
  * Drives the "above the hotbar" gun HUD via the vanilla action bar (Player.sendActionBar) -- a
@@ -35,7 +35,7 @@ object ActionBarManager {
         val progress = Combat.reloadProgress[player]
         val text =
             if (progress != null) {
-                Component.text("Reloading ", NamedTextColor.GRAY).append(progressBar(progress))
+                Component.text("Reload ", NamedTextColor.GRAY).append(progressBar(progress))
             } else {
                 gun.ammoText(player.itemInMainHand)
             }

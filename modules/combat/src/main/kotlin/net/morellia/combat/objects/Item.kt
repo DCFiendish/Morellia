@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component
 import net.minestom.server.component.DataComponents
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
+import net.minestom.server.item.component.CustomModelData
 import net.morellia.combat.constants.Tags
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -15,6 +16,13 @@ open class Item(
     val itemLore: List<Component> = emptyList(),
     val itemModel: String? = null,
     val material: Material = Material.STICK,
+    /**
+     * obj³-baked mesh weapons select their model via a `custom_model_data` string on a carrier
+     * material (e.g. iron_ingot), not the `item_model` path [itemModel] uses -- see
+     * TestGunGive.kt/DevLoadout.kt's obj³ items and docs/HANDOFF.md's obj³ playbook. The two are
+     * independent: a gun can set either, both, or neither.
+     */
+    val customModelData: String? = null,
 ) {
     /** Builds a fresh physical stack. Every call stamps a new [Tags.INSTANCE_ID] -- see its kdoc. */
     open fun toItemStack(): ItemStack {
@@ -25,6 +33,9 @@ open class Item(
                 .withTag(Tags.NAME, name)
                 .withTag(Tags.INSTANCE_ID, UUID.randomUUID())
         if (itemModel != null) stack = stack.with(DataComponents.ITEM_MODEL, itemModel)
+        if (customModelData != null) {
+            stack = stack.with(DataComponents.CUSTOM_MODEL_DATA, CustomModelData(listOf(), listOf(), listOf(customModelData), listOf()))
+        }
         return stack
     }
 

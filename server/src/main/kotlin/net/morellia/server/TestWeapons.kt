@@ -5,6 +5,7 @@ import net.aechronis.nodes.objects.TerritoryChunk
 import net.kyori.adventure.text.Component
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.instance.Instance
+import net.minestom.server.item.Material
 import net.morellia.combat.objects.Ammo
 import net.morellia.combat.objects.AmmoType
 import net.morellia.combat.objects.DamageFalloff
@@ -229,12 +230,46 @@ object TestWeapons {
             attackSpeed = 2.0,
         )
 
+    val kar98kRound =
+        Ammo(
+            name = "kar98k_round",
+            ammoType = AmmoType.RIFLE,
+            itemName = Component.text("7.92x57mm Mauser Round"),
+        )
+
+    // First real-model gun: obj3-imported mesh (TastyTony Kar98K, CC-BY 4.0 -- see
+    // resourcepack/CREDITS.md), carried on iron_ingot + custom_model_data since obj3 selects its
+    // baked model that way, not via item_model like the older item-model-based guns above. No
+    // itemModelEmpty/Reloading/Aiming variant exists yet for this pipeline (see docs/HANDOFF.md --
+    // GUI icon and per-state pose swap are still open), so it renders as one fixed model in every
+    // state. maxDamage 10f = 5 hearts (Minestom damage is HP, 1 heart = 2 HP) on a clean hit within
+    // falloffStartRange; real bolt-action stats otherwise -- 5-round magazine, slow single-shot
+    // cooldown/reload, heavy recoil, tight spread.
+    val kar98k =
+        Gun(
+            name = "kar98k",
+            itemName = Component.text("Kar98k"),
+            material = Material.IRON_INGOT,
+            customModelData = "kar98k_lowpoly",
+            ammo = kar98kRound,
+            magazineSize = 5,
+            damageFalloff = DamageFalloff(maxDamage = 10f, falloffStartRange = 40.0, falloffEndRange = 120.0, minDamage = 6f),
+            automatic = false,
+            cooldownMs = 1400,
+            reloadMs = 2600,
+            recoilMin = 13.5f,
+            recoilMax = 21f,
+            spreadMin = 0.3f,
+            spreadMax = 1.5f,
+        )
+
     fun register() {
         Item.registerItems(
             bayonet, artilleryShell, fieldGun, shotgunShell, shotgun,
             m1911Round, m1911, mauserC96Round, mauserC96,
             mp18Magazine, mp18, tommyGunMagazine, tommyGun,
             usTrenchKnife, nahkampfmesser, couteauPoignard,
+            kar98kRound, kar98k,
         )
     }
 }

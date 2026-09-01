@@ -8,5 +8,15 @@
     "sounds": [
       "morellia:guns/musket/reload"
     ]
+  },
+  "kar98k.fire": {
+    "sounds": [
+      "morellia:guns/kar98k/fire"
+    ]
+  },
+  "kar98k.reload": {
+    "sounds": [
+      "morellia:guns/kar98k/reload"
+    ]
   }
 }

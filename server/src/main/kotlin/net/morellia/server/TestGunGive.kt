@@ -16,6 +16,9 @@ import net.minestom.server.item.component.CustomModelData
  * on) for any of the imported obj³ weapons, so they can be inspected in-hand without waiting for
  * DevLoadout's on-spawn slots. Same item shape as the TEMP stacks in DevLoadout.kt -- keep the
  * name list there and here in sync if a model is added/removed/renamed.
+ *
+ * "kar98k" is special-cased below to hand the real, fully-loaded [TestWeapons.kar98k] Gun instead
+ * of the bare placeholder stack -- the only one of these eight wired into real combat stats so far.
  */
 class TestGunGive : Command("testgun", "morellia.testgun") {
     companion object {
@@ -43,7 +46,22 @@ class TestGunGive : Command("testgun", "morellia.testgun") {
         }
 
         addSyntax({ player: Player, context ->
-            val (customModelData, label) = WEAPONS.getValue(context[nameArg])
+            val name = context[nameArg]
+            if (name == "kar98k") {
+                val gun = TestWeapons.kar98k
+                val stack = gun.setAmmo(gun.toItemStack(), gun.magazineSize)
+                val given =
+                    player.inventory.addItemStack(stack) &&
+                        player.inventory.addItemStack(TestWeapons.kar98kRound.toItemStack().withAmount(20))
+                if (!given) {
+                    player.sendMessage(Component.text("Your inventory is full", NamedTextColor.RED))
+                } else {
+                    player.sendMessage(Component.text("Gave Kar98k + ammo", NamedTextColor.LIGHT_PURPLE))
+                }
+                return@addSyntax
+            }
+
+            val (customModelData, label) = WEAPONS.getValue(name)
             val stack =
                 ItemStack.of(Material.IRON_INGOT)
                     .with(DataComponents.CUSTOM_MODEL_DATA, CustomModelData(listOf(), listOf(), listOf(customModelData), listOf()))

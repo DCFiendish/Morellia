@@ -58,20 +58,10 @@ object DevLoadout {
             )
             inventory.setItemStack(17, TestWeapons.tommyGunMagazine.toItemStack().withAmount(4))
 
-            // TEMP: raw obj³ export visual check for the Kar98k import (see docs/HANDOFF.md's
-            // 2026-08-30 status update) -- not a real Gun yet, just an iron_ingot carrying the
-            // custom_model_data string the scratch export's item override matches on. Remove once
-            // the model is confirmed and wired into the real TestWeapons.kt pipeline.
-            try {
-                val testStack =
-                    ItemStack.of(Material.IRON_INGOT)
-                        .with(DataComponents.CUSTOM_MODEL_DATA, CustomModelData(listOf(), listOf(), listOf("kar98k_lowpoly"), listOf()))
-                        .with(DataComponents.ITEM_NAME, Component.text("KAR98K TEST", NamedTextColor.RED))
-                inventory.setItemStack(22, testStack)
-                println("[DevLoadout] kar98k test item set for ${player.username}: $testStack")
-            } catch (e: Exception) {
-                println("[DevLoadout] FAILED to set kar98k test item for ${player.username}: ${e.stackTraceToString()}")
-            }
+            // Real Kar98k gun now (see TestWeapons.kt) -- obj3-imported model, 5-heart real stats,
+            // no longer the bare iron_ingot visual-check placeholder.
+            inventory.setItemStack(21, TestWeapons.kar98kRound.toItemStack().withAmount(20))
+            inventory.setItemStack(22, TestWeapons.kar98k.setAmmo(TestWeapons.kar98k.toItemStack(), TestWeapons.kar98k.magazineSize))
 
             // TEMP: raw obj³ export visual check for the Lebel M1886 import (first of the newly
             // downloaded TastyTony models, see docs/HANDOFF.md). Not a real Gun yet, just an

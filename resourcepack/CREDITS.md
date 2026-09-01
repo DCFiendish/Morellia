@@ -124,6 +124,15 @@ recorded here as they're added.
   this is a generic "bolt-action rifle" sound, reusable as-is for any future bolt-action gun until/
   unless a gun-specific reload sound is sourced (see the asset-sourcing doc's category-reuse note).
 
+## Kar98k fire/reload sound (`assets/morellia/sounds/guns/kar98k/{fire,reload}.ogg`)
+
+- **Source**: same underlying files as the musket's fire/reload sounds above (Vincent Sevedge's
+  Mosin Nagant gunshot / the generic bolt-action-cocking clip), copied into a per-gun folder --
+  same license/attribution as those two entries. Kar98k is the first gun wired with real combat
+  stats since musket/Springfield/Karabiner were dropped for asset quality (see docs/HANDOFF.md);
+  no Kar98k-specific recording has been sourced yet, and the fire sound in particular is a real
+  Mosin Nagant (not a Mauser) -- placeholder, replace when a dedicated recording is found.
+
 ## ADS sight vignette (`assets/minecraft/textures/misc/pumpkinblur.png`)
 
 - **Source**: original, generated with [`make_sight_vignette.py`](make_sight_vignette.py) (Pillow
