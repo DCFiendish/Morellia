@@ -33,6 +33,8 @@ object Combat {
     internal val aimingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
     /** Players currently holding a WASD movement key -- see MovementListener, read by Gun.fire for spread. */
     internal val movingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
+    /** Players currently sprinting -- see MovementListener, read by Gun.fire for the running-spread penalty. */
+    internal val sprintingPlayers: MutableSet<Player> = ConcurrentHashMap.newKeySet()
     internal val meleeLastAttackTimes = ConcurrentHashMap<Player, Long>()
 
     fun initialize() {
@@ -58,6 +60,7 @@ object Combat {
         reloadProgress.remove(player)
         aimingPlayers.remove(player)
         movingPlayers.remove(player)
+        sprintingPlayers.remove(player)
         meleeLastAttackTimes.remove(player)
     }
 }

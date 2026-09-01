@@ -53,11 +53,18 @@ object AimingListener {
         }
     }
 
-    /** Clears aiming state (speed modifier + vignette) if the player hotbar-switches off a Gun mid-aim. */
+    /**
+     * Clears aiming state (speed modifier + vignette) if the player hotbar-switches off a Gun
+     * mid-aim -- or, if they switch to a *different* Gun while still aiming (no shift press/release
+     * edge fires on a hotbar swap, so [startAiming] never re-runs on its own), re-applies the aim
+     * effects using the new gun's own adsZoomStrength/adsVignette instead of leaving the old gun's
+     * values stuck on.
+     */
     private fun onHeldSlotChange(event: PlayerChangeHeldSlotEvent) {
         val player = event.player
         if (player !in Combat.aimingPlayers) return
-        if (Item.getFromItemStack(event.getItemInNewSlot()) !is Gun) stopAiming(player)
+        val newGun = Item.getFromItemStack(event.getItemInNewSlot()) as? Gun
+        if (newGun == null) stopAiming(player) else applyAimEffects(player, newGun)
     }
 
     private fun startAiming(
@@ -65,11 +72,19 @@ object AimingListener {
         gun: Gun,
     ) {
         if (!Combat.aimingPlayers.add(player)) return
-        val speedModifier = AttributeModifier(AIM_SPEED_MODIFIER_ID, -gun.adsZoomStrength, AttributeOperation.ADD_MULTIPLIED_TOTAL)
-        player.getAttribute(Attribute.MOVEMENT_SPEED).addModifier(speedModifier)
-        if (gun.adsVignette && gun.hasAmmo(player.itemInMainHand)) {
-            player.sendPacket(EntityEquipmentPacket(player.entityId, mapOf(EquipmentSlot.HELMET to SCOPE_VIGNETTE_HELMET)))
-        }
+        applyAimEffects(player, gun)
+    }
+
+    /** (Re-)applies [gun]'s zoom/vignette to [player], replacing whichever gun's values were active before. */
+    private fun applyAimEffects(
+        player: Player,
+        gun: Gun,
+    ) {
+        val speedAttribute = player.getAttribute(Attribute.MOVEMENT_SPEED)
+        speedAttribute.removeModifier(AIM_SPEED_MODIFIER_ID)
+        speedAttribute.addModifier(AttributeModifier(AIM_SPEED_MODIFIER_ID, -gun.adsZoomStrength, AttributeOperation.ADD_MULTIPLIED_TOTAL))
+        val helmet = if (gun.adsVignette && gun.hasAmmo(player.itemInMainHand)) SCOPE_VIGNETTE_HELMET else player.helmet
+        player.sendPacket(EntityEquipmentPacket(player.entityId, mapOf(EquipmentSlot.HELMET to helmet)))
         gun.refreshModel(player)
     }
 

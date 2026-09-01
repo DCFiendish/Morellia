@@ -842,6 +842,67 @@ recentering/grip-point effort above was building toward.
   `DevLoadout.kt`'s `TEMP` block removal remain outstanding, same as every entry above — still
   gated on the full pose (including left-hand) being confirmed.
 
+## Status update (2026-09-01): combat feel fixes, sprint-based spread, and the first obj³ ADS pose (Kar98k) confirmed in-game
+
+Direct continuation of `modules/combat` polish, plus the first real ADS pose for an obj³-pipeline
+gun (the entry above only covered the hip-fire pose).
+
+**Combat bug fixes** (all in `modules/combat`):
+- `AimingListener`: switching to a *different* Gun mid-aim (no shift press/release edge fires on a
+  hotbar swap) used to leave the old gun's `adsZoomStrength`/`adsVignette` stuck on. Split
+  `startAiming` into a reusable `applyAimEffects(player, gun)` also called from
+  `onHeldSlotChange` when the new held item is still a Gun.
+- `Gun`'s `init` block now validates `recoilMax >= recoilMin`, `spreadMin >= 0`,
+  `spreadMax >= spreadMin`, `sprintSpreadMultiplier >= 1` — previously a bad config (e.g. max <
+  min) silently produced broken recoil/spread with no error.
+- Pulling the trigger on an empty magazine with no reserve ammo used to be completely silent (no
+  sound, no feedback at all) — added `Gun.soundEmpty` (defaults to vanilla
+  `minecraft:block.lever.click`), played on that path.
+- Friendly fire was already handled — `NodesPlayerDamageListener` hooks `EntityDamageEvent`
+  globally at high priority and checks attacker/victim relationship; `Gun.fire`'s
+  `Damage.fromProjectile` goes through that same event. No combat-module change needed.
+
+**Sprint-based spread**: `MovementListener` now also tracks `Combat.sprintingPlayers` via
+`PlayerInputEvent.isHoldingSprintKey()` (previously only WASD-held was tracked, with no walk/sprint
+distinction). New `Gun.sprintSpreadMultiplier` (default `3f`) scales `spreadMin`/`spreadMax` while
+sprinting; standing/crouched is still fully suppressed, unchanged. Kar98k tuned to
+`spreadMin=4f, spreadMax=9f, sprintSpreadMultiplier=2.5f` — walking is "basically unusable" and
+sprinting is "unusable even point-blank" (both explicit design goals, checked against
+miss-distance-at-range math, not just vibes) while standing/crouched stays pinpoint.
+
+**Kar98k ADS pose — first one done for the obj³ pipeline, confirmed in-game**:
+- `Gun.refreshModel` previously only swapped `DataComponents.ITEM_MODEL` (the item_model
+  pipeline's musket/springfield/karabiner) — obj³ guns select via `CUSTOM_MODEL_DATA` instead (see
+  `Item.customModelData`'s kdoc) and had no aiming-variant support at all yet. Added
+  `Gun.customModelDataAiming` (mirrors `itemModelAiming`'s convention) and `refreshModel` now swaps
+  `CUSTOM_MODEL_DATA`'s string too when set, independent of the `ITEM_MODEL` swap.
+- Confirmed dead end first: there is no way to preview an obj³ mesh's firstperson pose inside
+  Blockbench. Its native Display-preset preview needs `Formats.*.display_mode: true`
+  (`java_block`/`bedrock_block`), which requires `meshes: false` (cubes only); the only format that
+  can hold an obj³ baked mesh (`free`) has no display preview at all. No format supports both.
+  Plain viewport screenshots are Blockbench's editor camera, not Minecraft's hand-render matrix —
+  confirmed not trustworthy for this. Real client is the only ground truth, same conclusion as the
+  musket/springfield centering work.
+- Reused the hip-fire pose's rotation unchanged (no new rotation = no new anchor-swing to cancel,
+  so section 5's closed-form formula doesn't apply here) and only added a translation delta on top,
+  live-tuned against the real client by binary search on the horizontal (X) component:
+  `-2` (way right) → `-8` (almost centered, bit left) → `-9` (bit too far left) → `-8.5`
+  (**confirmed perfect**). Final: `translation: [-8.5, 4, 5]` righthand /
+  `[8.5, 4, 5]` lefthand (mirrored X), rotation unchanged from hip-fire (`[0,90,0]`/`[0,-90,0]`).
+- **Generalized for the remaining 7 obj³ guns** (Lebel M1886, Fedorov Avtomat, Mossberg Patriot,
+  SKS, Springfield 1873, VPO-102, Beretta 57 — none of these have real `Gun` stats yet, still
+  `/testgun`-only placeholder items per `TestGunGive.kt`): new
+  [`tools/gen-obj3-aiming-pose.js`](../tools/gen-obj3-aiming-pose.js) scaffolds the clone-and-patch
+  step + selector wiring from a `--dx`/`--dy`/`--dz` translation delta (defaults to the Kar98k
+  numbers above as a starting guess, not a promise), documented as playbook §5.5 in
+  [`obj3_weapon_import_playbook.md`](blockbench-reference/obj3_weapon_import_playbook.md). `dx`
+  (horizontal) should transfer reasonably across guns since it's compensating for a fixed
+  client-side anchor shared by every item; `dy`/`dz` are weaker priors tied to each gun's own
+  proportions and should be expected to need their own live-tuning pass.
+- **Not yet done**: none of the other 7 guns have had this run yet (no real `Gun` stats to attach
+  it to in the first place — that's the actual blocker, not the pose work). Kar98k's aiming pose
+  hasn't been checked with `adsVignette`/zoom interaction beyond the swap-while-aiming fix above.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically

@@ -251,6 +251,7 @@ object TestWeapons {
             itemName = Component.text("Kar98k"),
             material = Material.IRON_INGOT,
             customModelData = "kar98k_lowpoly",
+            customModelDataAiming = "kar98k_lowpoly_aiming",
             ammo = kar98kRound,
             magazineSize = 5,
             damageFalloff = DamageFalloff(maxDamage = 10f, falloffStartRange = 40.0, falloffEndRange = 120.0, minDamage = 6f),
@@ -259,8 +260,11 @@ object TestWeapons {
             reloadMs = 2600,
             recoilMin = 13.5f,
             recoilMax = 21f,
-            spreadMin = 0.3f,
-            spreadMax = 1.5f,
+            spreadMin = 4f,
+            spreadMax = 9f,
+            // Bolt-action: pinpoint standing/crouched (spreadSuppressed in Gun.fire), basically
+            // unusable walking, and unusable even point-blank sprinting -- stop to actually land a hit.
+            sprintSpreadMultiplier = 2.5f,
         )
 
     fun register() {

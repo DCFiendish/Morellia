@@ -254,6 +254,48 @@ the Kar98K for hours before we read the shader source directly.
 Confirmed on the Kar98K: after both fixes, third-person right-hand needed no further hand-tuning at
 all beyond picking the rotation — translation came directly from the formula.
 
+## 5.5. Optional: aiming (ADS) pose — translation only, no new rotation
+
+Confirmed working on the Kar98k (2026-09-01). This gives the gun a second, distinct firstperson
+pose ("peering down the barrel" when the player aims) — it's a separate concern from section 5's
+hip-fire pose and only needs doing once the hip-fire pose is already confirmed good.
+
+**No swing-cancellation math needed here** — unlike section 5, the aiming pose reuses the *same*
+rotation as hip-fire (no new rotation means no new anchor-swing to cancel), and just adds a
+translation delta on top of the already-correct hip-fire translation. This is a plain
+[`Gun.customModelDataAiming`](../../modules/combat/src/main/kotlin/net/morellia/combat/objects/Gun.kt)
+swap in `CUSTOM_MODEL_DATA` — same mechanism `Gun.itemModelAiming` already used for the older
+item_model-pipeline guns (musket/springfield/karabiner), extended to also cover this obj³
+`custom_model_data`-selected pipeline (see `Gun.refreshModel`).
+
+**Generate it**: `node tools/gen-obj3-aiming-pose.js <base_custom_model_data> [--dx=N] [--dy=N] [--dz=N]`
+— clones the existing `<name>_firstperson_{righthand,lefthand}.json` (same mesh, only
+`display.firstperson_*` changes) into `<name>_aiming_firstperson_*.json`, and inserts/replaces a
+`<name>_aiming` case in `iron_ingot.json`'s selector (reusing the base gun's thirdperson/ground/
+on_shelf/fallback models unchanged — aiming only touches the two firstperson hand poses). Re-running
+for the same name replaces its files/case in place, so iterating is just re-run + rebuild + restart.
+
+**Defaults are the Kar98k-confirmed deltas** (`dx=-8.5, dy=2.5, dz=5`), not a promise for a
+different-shaped gun:
+- `dx` (horizontal, mirrored sign for left hand) corrects for Mojang's fixed client-side
+  right-hand render anchor — the same constant for *every* item — so it tends to transfer across
+  guns whose mesh is roughly left-right symmetric around its own local origin (check the mesh's
+  bounding box before trusting it blindly on a very asymmetric model).
+- `dy` (raise) / `dz` (pull closer to camera) depend on the gun's own length/proportions — treat
+  these as a much weaker prior and expect to re-tune per gun.
+
+**There is no way to preview this inside Blockbench** — checked directly: Blockbench's native
+Display-preset preview (`Formats.java_block`/`bedrock_block`, `display_mode: true`) requires
+`meshes: false` (cubes only), and the only format that can hold an obj³ baked mesh (`free`) has no
+display preview at all. No format supports both. Plain viewport screenshots are just Blockbench's
+editor camera, not Minecraft's hand-render matrix — don't trust them for this. The real client is
+the only ground truth; **binary-search `--dx`** against it (adjust, rebuild, restart, reconnect,
+look, repeat) rather than guessing blindly — converges in a handful of rounds once you have one
+data point in each direction.
+
+Once the pose is confirmed, wire it into the real weapon definition:
+`customModelDataAiming = "<name>_aiming"` on the `Gun(...)` call in `TestWeapons.kt`.
+
 ## 6. Rebuild and redeploy the local test pack
 
 - Build the zip with `jar cf resourcepack.zip -C <merge-dir> .` — **not** PowerShell's
