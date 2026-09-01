@@ -14,9 +14,10 @@ private const val BAR_SEGMENTS = 10
 
 /**
  * Drives the "above the hotbar" gun HUD via the vanilla action bar (Player.sendActionBar) -- a
- * fill-bar while reloading (Combat.reloadProgress, kept live by ReloadListener), otherwise the
- * gun's name + current/max ammo (Gun.ammoText). Both share one packet/location so the HUD doesn't
- * jump between two different screen regions depending on state.
+ * fill-bar while reloading (Combat.reloadProgress, kept live by ReloadListener), a fill-bar while
+ * the post-shot cooldown hasn't elapsed yet (Combat.playerLastFireTimes/Gun.cooldownMs -- how long
+ * until the gun can fire again), otherwise the gun's name + current/max ammo (Gun.ammoText). All
+ * three share one packet/location so the HUD doesn't jump between different screen regions.
  */
 object ActionBarManager {
     fun start() {
@@ -32,20 +33,37 @@ object ActionBarManager {
 
     private fun update(player: Player) {
         val gun = Item.getFromItemStack(player.itemInMainHand) as? Gun ?: return
-        val progress = Combat.reloadProgress[player]
+        val reloadProgress = Combat.reloadProgress[player]
+        val cooldownProgress = if (reloadProgress == null) cooldownProgress(player, gun) else null
         val text =
-            if (progress != null) {
-                Component.text("Reload ", NamedTextColor.GRAY).append(progressBar(progress))
-            } else {
-                gun.ammoText(player.itemInMainHand)
+            when {
+                reloadProgress != null ->
+                    Component.text("Reload ", NamedTextColor.GRAY).append(progressBar(reloadProgress, NamedTextColor.YELLOW))
+                cooldownProgress != null ->
+                    Component.text("Ready ", NamedTextColor.GRAY).append(progressBar(cooldownProgress, NamedTextColor.RED))
+                else -> gun.ammoText(player.itemInMainHand)
             }
         player.sendActionBar(text)
     }
 
-    private fun progressBar(progress: Double): Component {
+    /** 0.0-1.0 fraction of the way from "just fired" to "can fire again", or null once the cooldown's elapsed. */
+    private fun cooldownProgress(
+        player: Player,
+        gun: Gun,
+    ): Double? {
+        val lastFire = Combat.playerLastFireTimes[player] ?: return null
+        val elapsed = System.currentTimeMillis() - lastFire
+        if (elapsed >= gun.cooldownMs) return null
+        return elapsed.toDouble() / gun.cooldownMs
+    }
+
+    private fun progressBar(
+        progress: Double,
+        filledColor: NamedTextColor,
+    ): Component {
         val filled = (progress.coerceIn(0.0, 1.0) * BAR_SEGMENTS).toInt()
         return Component
-            .text("|".repeat(filled), NamedTextColor.YELLOW)
+            .text("|".repeat(filled), filledColor)
             .append(Component.text("|".repeat(BAR_SEGMENTS - filled), NamedTextColor.DARK_GRAY))
     }
 }
