@@ -322,6 +322,11 @@ object FlagWar {
         WarSerializer.save(true)
     }
 
+    // A single-chunk territory's core chunk is also its only border chunk. With
+    // canOnlyAttackBorders on, that chunk is the sole capturable target for that territory --
+    // gating it behind canAnnexTerritories too makes the whole territory uncapturable.
+    internal fun canCaptureTerritoryCore(): Boolean = canAnnexTerritories || canOnlyAttackBorders
+
     // initiate attack on a territory chunk:
     // 1. check chunk is valid target, flag placement valid,
     //    and player can attack
@@ -367,7 +372,7 @@ object FlagWar {
         // 2. town chunk occupied by enemy
         // 3. allied chunk occupied by enemy
         if (chunkIsEnemy(chunk, territory, attackingTown)) {
-            if (!canAnnexTerritories && chunk.coord == territory.core) {
+            if (!canCaptureTerritoryCore() && chunk.coord == territory.core) {
                 return Result.failure(ErrorAnnexDisabled)
             }
 
@@ -566,7 +571,7 @@ object FlagWar {
         val attackingTown = resident.town ?: return
         val chunk = TerritoryChunk.fromCoord(coord) ?: return
         if (chunk.attacker !== null || chunk.territory.town === null) return
-        if (!canAnnexTerritories && chunk.coord == chunk.territory.core) return
+        if (!canCaptureTerritoryCore() && chunk.coord == chunk.territory.core) return
 
         val attack = createAttack(attacker, attackingTown, chunk, flagBase)
         val now = System.currentTimeMillis() / 1000
@@ -895,7 +900,7 @@ object FlagWar {
             return
         }
 
-        if (chunk.coord == chunk.territory.core && !canAnnexTerritories) {
+        if (chunk.coord == chunk.territory.core && !canCaptureTerritoryCore()) {
             chunk.attacker = null
             Resident.renderMinimaps()
             return

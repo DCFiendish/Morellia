@@ -166,8 +166,6 @@ object NodesWorldListener {
         val blockPos = event.blockPosition
         val player: Player = event.player
 
-        NodesBlockPlacementCooldownListener.apply(player, blockPos.blockX, blockPos.blockZ)
-
         // war specific tasks
         if (FlagWar.enabled) {
             val territoryChunk = TerritoryChunk.fromBlock(blockPos.blockX, blockPos.blockZ)
@@ -277,6 +275,7 @@ object NodesWorldListener {
                 return
             }
 
+            NodesBlockPlacementCooldownListener.apply(player, blockPos.blockX, blockPos.blockZ)
             event.isCancelled = true
             Message.error(player, "You cannot build here!")
             return
@@ -288,6 +287,7 @@ object NodesWorldListener {
             val plotPermission = plot?.let { getPlotPermission(TownPermissions.BUILD, it, resident, town) }
             if (plotPermission != null) {
                 if (plotPermission) return
+                NodesBlockPlacementCooldownListener.apply(player, blockPos.blockX, blockPos.blockZ)
                 event.isCancelled = true
                 Message.error(player, "You cannot build here!")
                 return
@@ -314,6 +314,7 @@ object NodesWorldListener {
             }
         }
 
+        NodesBlockPlacementCooldownListener.apply(player, blockPos.blockX, blockPos.blockZ)
         event.isCancelled = true
         Message.error(player, "You cannot build here!")
     }
