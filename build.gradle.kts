@@ -13,6 +13,7 @@ allprojects {
         maven("https://repo.lucko.me/") // spark-common, spark-minestom's own transitive dep
         maven("https://oss.sonatype.org/content/repositories/snapshots/") // spark-common's own transitive deps
         maven("https://maven.conceptmc.com/releases") // com.conceptmc:luckperms-minestom — unaudited SNAPSHOT, server-only test dep
+        maven("https://maven.enginehub.org/repo/") // com.sk89q.worldedit:worldedit-core (modules/worldedit)
 
         // One block per Aechronis library actually depended on — each library publishes to its
         // own GitHub Packages path (Aechronis/<repo>), not a shared "Aechronis/aechronis" package.

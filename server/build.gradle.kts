@@ -19,6 +19,7 @@ dependencies {
     implementation(project(":modules:vanilla"))
     implementation(project(":modules:nodes"))
     implementation(project(":modules:combat"))
+    implementation(project(":modules:worldedit"))
     implementation("org.slf4j:slf4j-simple:2.0.18")
     // Perf profiler -- github.com/LooFifteen/spark's Minestom port of lucko/spark, see Main.kt's
     // SparkMinestom.builder() call. Only version currently published to repo.hypera.dev.

@@ -20,7 +20,6 @@ import io.github.openminigameserver.worldedit.platform.actors.MinestomPlayer
 import io.github.openminigameserver.worldedit.platform.adapters.MinestomAdapter
 import io.github.openminigameserver.worldedit.platform.adapters.MinestomWorld
 import io.github.openminigameserver.worldedit.platform.misc.WorldEditCommand
-import net.aechronis.server.modules.ModuleEvents
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.EntityType
 import net.minestom.server.entity.PlayerHand
@@ -57,7 +56,7 @@ class MinestomPlatform(
                 installGameHooks()
                 gameHooksRegistered = true
             }
-            ModuleEvents.addChild(handler, gameHooksNode)
+            handler.addChild(gameHooksNode)
         } else {
             handler.removeChild(gameHooksNode)
         }

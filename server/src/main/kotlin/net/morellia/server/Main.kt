@@ -13,7 +13,10 @@ import net.minestom.server.command.ConsoleSender
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.Player
 import net.minestom.server.instance.anvil.AnvilLoader
+import io.github.openminigameserver.worldedit.MinestomWorldEdit
+import io.github.openminigameserver.worldedit.platform.config.WorldEditConfig
 import net.morellia.combat.Combat
+import java.io.File
 import java.nio.file.Path
 
 fun main() {
@@ -47,6 +50,12 @@ fun main() {
     // without this it defaults to (0,64,0), off the edge of the Nodisium map.
     Nodes.initialize(NodesConfig(path = "morellia-data/nodes", chunkAttackTime = 7500, defaultRespawnPoint = spawnPoint, canInteractInEmpty = false, canInteractInUnclaimed = false, adminUsernames = setOf("DCFiendish")))
     Combat.initialize()
+    // Admin build/grief-cleanup tool for the pvp playtest -- ported from Aechronis/aechronis's
+    // modules/worldedit (a Minestom platform adapter over the real sk89q worldedit-core, not a
+    // reimplementation). Their own AechronisModule/ModuleContext service-loader wrapper and
+    // ModuleEvents helper don't exist here -- stripped in favor of calling this directly, same
+    // convention as Vanilla.init()/Nodes.initialize()/Combat.initialize() above.
+    MinestomWorldEdit().init(WorldEditConfig(dataFolder = File("morellia-data/worldedit")))
     TestWeapons.register()
     ResourcePack.init()
     TickMonitor.init()
