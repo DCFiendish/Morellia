@@ -8,10 +8,10 @@ import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
 import java.net.URI
 import java.util.UUID
 
-// Local-only for now (no deploys to the production VM during the replan -- see docs/HANDOFF.md).
-// Serve resourcepack.zip yourself before starting the server, e.g. from server/:
-//   python -m http.server 8000
-private val PACK_URL = URI.create("http://localhost:8000/resourcepack.zip")
+// Served from a GitHub release so prod doesn't need a dedicated file host/port.
+// To update the pack: zip resourcepack/assets + resourcepack/pack.mcmeta, then
+//   gh release upload resourcepack-v1 resourcepack.zip --clobber --repo DCFiendish/Nodisium
+private val PACK_URL = URI.create("https://github.com/DCFiendish/Nodisium/releases/download/resourcepack-v1/resourcepack.zip")
 private val PACK_ID = UUID.fromString("6d6f7265-6c6c-6961-706b-000000000001")
 
 object ResourcePack {
