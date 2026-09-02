@@ -13,7 +13,7 @@
         "Java 25": "ghcr.io/pterodactyl/yolks:java_25"
     },
     "file_denylist": [],
-    "startup": "java -Xms128M -XX:MaxRAMPercentage=95.0 -jar {{SERVER_JARFILE}}",
+    "startup": "java -Xms128M -XX:MaxRAMPercentage=95.0 -Dminestom.dispatcher-threads=4 -jar {{SERVER_JARFILE}}",
     "config": {
         "files": "{}",
         "startup": "{\"done\":\"Morellia test server ready\"}",
