@@ -10,7 +10,17 @@ object PvpPrepListener {
     fun onDamage(event: EntityDamageEvent) {
         val victim = event.entity as? Player ?: return
         val instance = victim.instance ?: return
-        if (PvpPrep.isInside(instance, victim.position)) event.isCancelled = true
+        if (PvpPrep.isInside(instance, victim.position)) {
+            event.isCancelled = true
+            return
+        }
+        // Also block damage dealt BY an attacker standing in the zone (guns/melee both set
+        // Damage.attacker to the attacking player -- see Gun.fire/MeleeListener.onAttack) --
+        // otherwise the zone is a safe sniping perch: immune to return fire while still able to
+        // shoot out at players standing outside it.
+        val attacker = event.damage.attacker as? Player ?: return
+        val attackerInstance = attacker.instance ?: return
+        if (PvpPrep.isInside(attackerInstance, attacker.position)) event.isCancelled = true
     }
 
     fun onBlockBreak(event: PlayerBlockBreakEvent) {
