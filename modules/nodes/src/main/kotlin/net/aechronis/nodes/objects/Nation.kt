@@ -20,6 +20,7 @@ import net.minestom.server.command.CommandSender
 import net.minestom.server.entity.Player
 import java.util.Random
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 // random number generator
 private val random = Random()
@@ -267,16 +268,13 @@ class Nation(
         }
     }
 
-    // must be Set to satisfy bukkit interface in Chat.kt
-    val playersOnline: MutableSet<Player> = mutableSetOf()
-
-    val towns: HashSet<Town> = hashSetOf()
-    val residents: HashSet<Resident> = hashSetOf()
-
-    // nation's diplomatic relations: allies, enemies
-    // determine who nation can attack during war
-    val allies: HashSet<Nation> = hashSetOf()
-    val enemies: HashSet<Nation> = hashSetOf()
+    // Same cross-thread-mutation shape as Town.kt's fields (see its comment) -- nation-level
+    // commands (join/leave/ally/enemy) run per-acting-player, not per-nation, same risk.
+    val playersOnline: MutableSet<Player> = ConcurrentHashMap.newKeySet()
+    val towns: MutableSet<Town> = ConcurrentHashMap.newKeySet()
+    val residents: MutableSet<Resident> = ConcurrentHashMap.newKeySet()
+    val allies: MutableSet<Nation> = ConcurrentHashMap.newKeySet()
+    val enemies: MutableSet<Nation> = ConcurrentHashMap.newKeySet()
 
     // color for displaying on map
     // assign random color by default

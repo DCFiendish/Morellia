@@ -38,6 +38,7 @@ import net.minestom.server.timer.Task
 import net.minestom.server.timer.TaskSchedule
 import java.util.EnumSet
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -518,28 +519,23 @@ class Town(
     // used by nametag scoreboard system (cannot use name because 16 char team limit)
     val townNametagId: Int = townNametagIdCounter.getAndIncrement()
 
-    // residents belong to town
-    val residents: HashSet<Resident> = hashSetOf()
-
-    // officer rank players (assistants to leader)
-    val officers: HashSet<Resident> = hashSetOf()
-
-    // territories owned by town
-    // this includes annexed territories
-    val territories: HashSet<TerritoryId> = hashSetOf(home)
-
-    // separate set of all annexed territories
-    val annexed: HashSet<TerritoryId> = hashSetOf()
-
-    // territories captured by town (but not annexed)
-    val captured: HashSet<TerritoryId> = hashSetOf()
+    // Same reachable-cross-thread shape as Nodes.kt's singleton maps (see its own comment) --
+    // town commands run on the acting player's own thread, not a per-town thread, so two members
+    // of the same town in different chunks both mutating one Town instance (kick + join, promote
+    // + leave, etc.) hits these plain collections from genuinely different threads under
+    // dispatcher-threads>1. ConcurrentHashMap.newKeySet(), matching FlagWar.kt's own established
+    // pattern for a concurrent Set.
+    val residents: MutableSet<Resident> = ConcurrentHashMap.newKeySet()
+    val officers: MutableSet<Resident> = ConcurrentHashMap.newKeySet()
+    val territories: MutableSet<TerritoryId> = ConcurrentHashMap.newKeySet<TerritoryId>().apply { add(home) }
+    val annexed: MutableSet<TerritoryId> = ConcurrentHashMap.newKeySet()
+    val captured: MutableSet<TerritoryId> = ConcurrentHashMap.newKeySet()
 
     // nation for town
     var nation: Nation? = null
 
     // players currently online in town
-    // must be Set to satisfy bukkit interface in Chat.kt
-    val playersOnline: MutableSet<Player> = mutableSetOf()
+    val playersOnline: MutableSet<Player> = ConcurrentHashMap.newKeySet()
 
     // income storage container from territory income
     // map material -> current amount of it
@@ -551,10 +547,12 @@ class Town(
         createEnumArrayMap<TownPermissions, EnumSet<PermissionsGroup>> { _ -> EnumSet.of(PermissionsGroup.TOWN) }
 
     // protected chest blocks in town (for leader, officers, + trusted players)
-    val protectedBlocks: HashSet<BlockVec> = hashSetOf()
+    val protectedBlocks: MutableSet<BlockVec> = ConcurrentHashMap.newKeySet()
 
-    // persistent 3D cuboid plots inside the town's claimed territory
-    val plots: LinkedHashMap<String, Plot> = linkedMapOf()
+    // persistent 3D cuboid plots inside the town's claimed territory. Was LinkedHashMap --
+    // checked every non-sorted call site (plots.values.forEach/map/filter for save-state,
+    // deletion sweep, permission checks), none depend on insertion order.
+    val plots: ConcurrentHashMap<String, Plot> = ConcurrentHashMap()
 
     // color for displaying on map
     var color: Color = Color(
@@ -570,8 +568,10 @@ class Town(
     var nametagAlly: String = "${DiplomaticRelationship.ALLY.chatColor}[${this.name}]"
     var nametagEnemy: String = "${DiplomaticRelationship.ENEMY.chatColor}[${this.name}]"
 
-    // players applying to town and their tasks
-    val applications: HashMap<Resident, Task> = hashMapOf()
+    // players applying to town and their tasks -- same TOCTOU-on-corrupt-structure shape as
+    // Nodes.playerWarpTasks (an applicant and a leader accepting/denying run on different
+    // threads, both touching this map).
+    val applications: ConcurrentHashMap<Resident, Task> = ConcurrentHashMap()
 
     // json string and memoization flag
     private var saveState: TownSaveState

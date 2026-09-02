@@ -43,9 +43,29 @@ object Combat {
         bossBars.remove(player.uuid)?.let { player.hideBossBar(it) }
     }
 
+    /**
+     * `isInCombat` then `expiresAt[...] = ...` used to be a plain read-then-write -- and the two
+     * calls tagging a single hit's attacker/victim are NOT the only way this runs concurrently for
+     * the same player: `CombatListener.onDamage` calls this once per `EntityDamageEvent`, and a
+     * player fighting on two fronts at once (attacking X while simultaneously being hit by Y, where
+     * X and Y sit in different chunks) has this called from two different chunk-tick threads for the
+     * same UUID at the same instant under `dispatcher-threads > 1`. Both calls could see
+     * `wasInCombat == false` before either wrote `expiresAt`, creating two `BossBar`s -- the second
+     * `bossBars[player.uuid] = bar` write silently orphans the first one server-side while it's still
+     * showing client-side, since only the map's last-written bar is ever tracked to hide later.
+     *
+     * Fixed with `compute` (atomic per-key), not a `scheduleNextTick` deferral -- callers (tests
+     * included, see `CombatTest`) rely on `tag`'s effects being visible synchronously, unlike
+     * `EnvironmentalDamage.tick()`'s periodic sweep which has no such contract.
+     */
     private fun tagOne(player: Player) {
-        val wasInCombat = isInCombat(player)
-        expiresAt[player.uuid] = System.currentTimeMillis() + Vanilla.config.combatDurationSeconds * 1000
+        val now = System.currentTimeMillis()
+        val newExpiry = now + Vanilla.config.combatDurationSeconds * 1000
+        var wasInCombat = true
+        expiresAt.compute(player.uuid) { _, existing ->
+            wasInCombat = (existing ?: 0L) > now
+            newExpiry
+        }
 
         if (!wasInCombat) {
             val bar = BossBar.bossBar(Component.empty(), 1f, BossBar.Color.RED, BossBar.Overlay.PROGRESS)

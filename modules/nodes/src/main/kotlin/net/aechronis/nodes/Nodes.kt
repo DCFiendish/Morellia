@@ -62,6 +62,7 @@ import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ThreadLocalRandom
 import kotlin.system.measureNanoTime
 
@@ -71,21 +72,40 @@ object Nodes {
     val eventNode = EventNode.all("nodes")
     val highPriorityEventNode = EventNode.all("nodes-high-priority").setPriority(-999)
 
-    internal val resourceNodes: HashMap<String, ResourceNode> = hashMapOf()
+    // resourceNodes/territoryChunks/territories/towns/nations/residents/buildings are ALL
+    // cleared and rebuilt together by loadWorld() (see its kdoc), reachable live via
+    // /nodesadmin load (nodes.admin permission -- not console/startup-only) while players stay
+    // connected throughout (loadWorld()'s own `finally` block re-creates every online player's
+    // Resident/minimap afterward). territoryChunks/territories/minimapBuildingsByChunk were
+    // already fixed to ConcurrentHashMap in an earlier pass for exactly this reason -- the other
+    // five siblings, cleared by that same function on the same reachable path, were missed then.
+    // towns/nations/residents were LinkedHashMap; checked every non-sorted call site
+    // (ArgumentTown/Nation/Resident, NationCommand's list, Town.fromIncomeInventory, etc.) and
+    // none rely on insertion order -- display ordering is explicitly re-sorted where it matters
+    // (e.g. NationCommand's `sortByDescending`), so switching to ConcurrentHashMap costs nothing
+    // real. buildings was a plain MutableList (Building.register/destroy add/remove it
+    // per-placement, read on every /port command) -- CopyOnWriteArrayList, not a locked
+    // ArrayList, since writes are rare (player building placement) and reads are frequent
+    // (iterated every port lookup); its snapshot-iterator semantics also mean a concurrent
+    // add/remove during iteration can't throw here either.
+    internal val resourceNodes: ConcurrentHashMap<String, ResourceNode> = ConcurrentHashMap()
     internal val territoryChunks: ConcurrentHashMap<Coord, TerritoryChunk> = ConcurrentHashMap()
-
-    // Was a plain HashMap while territoryChunks (identical lifecycle: read on every chunk/block
-    // lookup, written only on territory load/reload) was already ConcurrentHashMap -- Territory
-    // lookups happen from Minestom's per-chunk worker threads, not one global thread, so this was
-    // a real concurrent read/write hazard on every territory reload.
     internal val territories: ConcurrentHashMap<TerritoryId, Territory> = ConcurrentHashMap()
-    internal val towns: LinkedHashMap<String, Town> = LinkedHashMap()
-    internal val nations: LinkedHashMap<String, Nation> = LinkedHashMap()
-    internal val residents: LinkedHashMap<UUID, Resident> = LinkedHashMap()
-    internal val buildings: MutableList<Building> = mutableListOf()
+    internal val towns: ConcurrentHashMap<String, Town> = ConcurrentHashMap()
+    internal val nations: ConcurrentHashMap<String, Nation> = ConcurrentHashMap()
+    internal val residents: ConcurrentHashMap<UUID, Resident> = ConcurrentHashMap()
+    internal val buildings: CopyOnWriteArrayList<Building> = CopyOnWriteArrayList()
     internal val minimapBuildingsByChunk: ConcurrentHashMap<Coord, Building> = ConcurrentHashMap()
-    var playerWarpTasks: HashMap<Player, Task> = hashMapOf()
-    var chunkToBuilding: HashMap<List<Int>, Building> = hashMapOf()
+    // Both were plain HashMap -- playerWarpTasks is read/written from PortWarpCommand's per-player
+    // command executor (a different thread per player, same territories/territoryChunks concern
+    // above) *and* removed from PortWarpTask's own scheduled-task callback (the scheduler thread,
+    // not any specific player's tick thread), so two players warping at once (or a warp completing
+    // while a different player starts one) mutate this plain HashMap from genuinely different
+    // threads. chunkToBuilding has the identical shape: written/removed by Building.kt on
+    // place/destroy (per-chunk-thread, player-triggered) and read by Nodes.kt's income tick (the
+    // scheduler thread) plus Building.getAt (any chunk-owning thread) concurrently.
+    val playerWarpTasks: ConcurrentHashMap<Player, Task> = ConcurrentHashMap()
+    val chunkToBuilding: ConcurrentHashMap<List<Int>, Building> = ConcurrentHashMap()
     internal var lastBackupTime: Long = 0
     val war = FlagWar
 

@@ -1,4 +1,4 @@
-# Handoff — Morellia project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration + combat built 2026-08-26)
+# Handoff — Morellia project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration + combat built 2026-08-26, combat hardened + spark added 2026-09-02)
 
 Deep background (library internals, design rationale) is in `RESEARCH.md`, `NODES_DEEP_DIVE.md`,
 `VANILLA_DEEP_DIVE.md`, `COMBAT_DEEP_DIVE.md`, and `research-todo/*.md` — not repeated here. This
@@ -902,6 +902,91 @@ miss-distance-at-range math, not just vibes) while standing/crouched stays pinpo
 - **Not yet done**: none of the other 7 guns have had this run yet (no real `Gun` stats to attach
   it to in the first place — that's the actual blocker, not the pose work). Kar98k's aiming pose
   hasn't been checked with `adsVignette`/zoom interaction beyond the swap-while-aiming fix above.
+
+## Status update (2026-09-02): Kar98k damage rebalanced, real `modules/combat` bugs found+fixed, spark profiler added, dispatcher-threads bumped to 4
+
+Direct continuation of `modules/combat` polish. Four separate asks in one session, landed as three
+commits (`e5803812`, `92fe45ae`, `c429a29e`, `80f33762`) plus a live Panel-side config change —
+each rebuilt, boot-tested locally via the `morellia-testclient` dev client and/or a bare local
+server run, then deployed to the VM (jar swap + `.bak` backup + container restart + clean-boot log
+check) before moving to the next.
+
+- **Kar98k damage, iterated three times to the final ask**: first bumped `maxDamage` 10f→12.7f so a
+  close-range hit does 6 hearts *through full leather armor* (7 armor/0 toughness — vanilla's
+  formula lands on the flat `armor/5` reduction floor at this damage level, ~5.6%), computed by
+  hand against Minecraft's real armor-reduction formula, not guessed. Then added a falloff tail
+  (100→300 blocks, `minDamage` 8.9f = 4 hearts through leather at 300+). **Final ask changed
+  direction**: falloff removed entirely — flat `maxDamage == minDamage == 12.7f` from 0 out to
+  `maxRange = 512.0` (the render-distance ceiling this project might push to), by collapsing
+  `DamageFalloff`'s start/end range to a single point rather than adding a separate flat-damage
+  type. See [`TestWeapons.kt`](../server/src/main/kotlin/net/morellia/server/TestWeapons.kt)'s
+  `kar98k` definition for the current numbers.
+- **A `/code-review`-style pass over all of `modules/combat`** (not diff-scoped — the whole module,
+  requested directly, effort auto-escalated to "high" by the loaded skill instructions) surfaced 4
+  real findings, all fixed:
+  1. **Gun/melee cooldown TOCTOU**: `Gun.fire`/`MeleeListener.onAttack` both did a plain
+     read-check-then-write on their per-player `ConcurrentHashMap` — the map itself is
+     thread-safe, the *compound* check-then-set operation on it wasn't. Two concurrent `fire()`
+     calls for the same player (the auto-fire scheduled task racing a fresh
+     `PlayerHandAnimationEvent`, running on genuinely different thread pools regardless of
+     `dispatcher-threads`) could both pass the elapsed-time check before either wrote back,
+     letting a gun fire faster than its configured `cooldownMs`. Fixed with a new
+     `Combat.tryStartCooldown` built on `ConcurrentHashMap.compute` (atomic per-key), shared by
+     both guns and melee — collapses what used to be duplicated cooldown logic into one place too.
+  2. **`FireListener`'s auto-fire task registration** had the identical TOCTOU shape
+     (`containsKey` then `put`) — switched to `computeIfAbsent`.
+  3. **`AimingListener`'s ADS scope-vignette bug**: `applyAimEffects`, when called from a
+     held-slot-change (switching guns mid-aim), read `player.itemInMainHand` to decide whether to
+     show the vignette — confirmed via decompiling Minestom's own `PlayerHeldListener` bytecode
+     that this is still the *outgoing* gun's stack at that point (`Player.setHeldItemSlot` only
+     runs after the event returns uncancelled). Fixed by threading
+     `PlayerChangeHeldSlotEvent.getItemInNewSlot()` through to `applyAimEffects` instead of letting
+     it read the stale field itself.
+  4. **No guard against a gun's falloff tail exceeding its own range** — `Gun`'s `init` block now
+     `require`s `damageFalloff.falloffEndRange <= maxRange`, since a falloff tail past `maxRange`
+     is silently dead (`fire()`'s hitscan ray never travels that far) — this is exactly the
+     misconfiguration the Kar98k's own falloff range had mid-session, caught by hand, before
+     `maxRange` was bumped alongside it.
+- **Spark performance profiler added**: [`LooFifteen/spark`](https://github.com/LooFifteen/spark)'s
+  Minestom port (`dev.lu15:spark-minestom:1.10-SNAPSHOT`, only version published to
+  `repo.hypera.dev`), wired into `Main.kt` — self-registers `/spark` (profiler flame graphs via
+  `spark.lucko.me`, `tps`/`health`/`gc` one-shot reports), gated behind the same `morellia.<node>`
+  permission convention (backed by `net.aechronis:utils`'s `hasPermission`) every other admin
+  command here already uses — no new permission model introduced. Confirmed on the VM's Linux
+  container that it loads the real native `async-profiler` engine (better flame graphs than the
+  Java-engine fallback Windows gets locally).
+- **`minestom.dispatcher-threads` bumped 1 → 4** to actually use the VM's 4 cores for per-chunk
+  tick parallelism (Minestom silently defaults to 1 — single-threaded chunk ticking — unless this
+  JVM system property is set; it wasn't, anywhere in this project, until now). Applied by editing
+  the *live* Pterodactyl server's startup command directly via the Panel's Application API (the
+  user supplied a `ptla_...` key) — `PATCH /api/application/servers/3/startup` — since the actual
+  container-level `STARTUP` env var isn't something `docker restart` can change; only a
+  Panel-driven restart makes Wings recreate the container against the new command. Confirmed via a
+  new container ID (`d0aa9ac8aa3b`) after the user restarted from the console, and the resolved
+  `STARTUP` env showing `-Dminestom.dispatcher-threads=4`. `server/morellia-egg.json`'s own
+  `startup` field updated to match, so a future re-import of the egg carries this forward.
+  **Real risk flagged, not yet acted on**: this is exactly the condition under which non-thread-safe
+  code elsewhere would start racing for real — see "still open" below.
+- **`docs/research-todo/01-concurrency-model.md` is now the wrong resolved-status source for
+  `modules/combat` specifically** — it documents the *design intent* (`ConcurrentHashMap`
+  everywhere) correctly, but the TOCTOU bugs above show intent alone wasn't sufficient; the actual
+  fix pattern (atomic `compute`/`computeIfAbsent`, not just a thread-safe collection type) isn't
+  written up there yet.
+
+**Still open, straight out of this session:**
+- **`modules/nodes` and `modules/vanilla` have not had the same check-then-act audit
+  `modules/combat` just got.** Now that `dispatcher-threads=4` is live on the VM (real per-chunk
+  parallelism, not the old effectively-sequential default), any plain read-then-write on shared
+  per-player/per-entity state in either module is a live risk, not a theoretical one — this is
+  strictly more urgent than it would have been a day ago. Worth the same kind of pass `modules/combat`
+  just got, focused specifically on state touched by both an event listener and a
+  `MinecraftServer.getSchedulerManager()` task (the exact shape every bug found above had).
+- `modules/utils` (external `net.aechronis:utils` dependency) — flagged since 2026-08-26, still
+  true: its post-2026-08-02 upstream history was never audited for fixes worth porting, unlike
+  `nodes`/`vanilla`. Separate from the concurrency point above since it's not code this project
+  owns directly.
+- The other 7 obj³ guns still have no real `Gun` stats to run a damage-falloff pass on (unchanged
+  blocker from the 2026-09-01 entry above).
 
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
