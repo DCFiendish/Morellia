@@ -19,6 +19,7 @@ import net.aechronis.nodes.utils.ChatColor
 import net.minestom.server.MinecraftServer
 import net.minestom.server.timer.Task
 import net.minestom.server.timer.TaskSchedule
+import java.util.concurrent.ConcurrentHashMap
 
 // alliance request status results
 enum class AllianceRequest {
@@ -34,11 +35,11 @@ private const val ALLY_REQUEST_TIMEOUT: Int = 1200
  */
 object Alliance {
 
-    // offers lists: maps NationPair involved -> Initiating Nation
-    val requests: HashMap<NationPair, Nation> = hashMapOf()
-
-    // threads to delete requests after timeout
-    val requestTimers: HashMap<NationPair, Task> = hashMapOf()
+    // Both plain HashMap -- request()/cancelRequest() run from either nation's command thread,
+    // and cancelRequest also fires from the scheduled timeout task's own thread. Same
+    // cross-thread shape as everything else fixed this session.
+    val requests: ConcurrentHashMap<NationPair, Nation> = ConcurrentHashMap()
+    val requestTimers: ConcurrentHashMap<NationPair, Task> = ConcurrentHashMap()
 
     /**
      * Offer/accept request between two nations. Inputs:

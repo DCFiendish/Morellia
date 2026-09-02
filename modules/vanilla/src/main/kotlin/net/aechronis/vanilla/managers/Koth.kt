@@ -17,6 +17,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 object Koth {
     internal data class ActiveKoth(
@@ -25,15 +26,21 @@ object Koth {
         val endsAt: Long,
         var capturer: UUID? = null,
         var captureStartedAt: Long? = null,
-        val bossBars: MutableMap<UUID, BossBar> = mutableMapOf(),
-        val visibleTo: MutableSet<UUID> = mutableSetOf(),
+        val bossBars: MutableMap<UUID, BossBar> = ConcurrentHashMap(),
+        val visibleTo: MutableSet<UUID> = ConcurrentHashMap.newKeySet(),
     )
 
+    // definitions/schedules/scheduledRuns are only ever touched from loadConfiguration() (boot)
+    // and scheduledTick()'s own single repeating task -- no other caller, so no fix needed there.
+    // active/deadPlayers are different: active is written by KothCommand's /koth start|stop (the
+    // acting player's thread) and by scheduledTick() (the scheduler thread) at once; deadPlayers
+    // is written by KothListener's death/respawn/quit handlers (each player's own thread) while
+    // read from isInside() during another player's zone check.
     private val definitions = linkedMapOf<String, KothConfig>()
     private val schedules = linkedMapOf<String, List<LocalTime>>()
     private val scheduledRuns = mutableMapOf<String, LocalDateTime>()
-    internal val active = linkedMapOf<String, ActiveKoth>()
-    internal val deadPlayers = mutableSetOf<UUID>()
+    internal val active = ConcurrentHashMap<String, ActiveKoth>()
+    internal val deadPlayers: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
 
     fun init() {
         val timeStart = System.currentTimeMillis()
@@ -51,7 +58,7 @@ object Koth {
 
     fun activeNames(): Set<String> = active.keys
 
-    fun isActive(name: String): Boolean = name in active
+    fun isActive(name: String): Boolean = active.containsKey(name)
 
     fun start(name: String): Boolean {
         val config = definitions[name] ?: return false
@@ -72,7 +79,7 @@ object Koth {
     }
 
     fun stop(name: String): Boolean {
-        if (name !in active) return false
+        if (!active.containsKey(name)) return false
         finish(name, null)
         return true
     }

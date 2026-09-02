@@ -11,6 +11,7 @@ import net.aechronis.nodes.utils.ChatColor
 import net.kyori.adventure.text.Component
 import net.minestom.server.entity.Player
 import net.minestom.server.event.player.PlayerChatEvent
+import java.util.concurrent.ConcurrentHashMap
 
 enum class ChatMode {
     GLOBAL,
@@ -21,7 +22,10 @@ enum class ChatMode {
 
 object Chat {
 
-    val playersMuteGlobal: HashSet<Player> = hashSetOf()
+    // Mutated by any player's own mute-toggle command thread, read on every chat message
+    // (potentially a different player's thread) -- ConcurrentHashMap.newKeySet(), matching
+    // FlagWar.kt's established concurrent-set pattern.
+    val playersMuteGlobal: MutableSet<Player> = ConcurrentHashMap.newKeySet()
 
     var colorDefault = ChatColor.WHITE
     val colorGreen = ChatColor.GREEN

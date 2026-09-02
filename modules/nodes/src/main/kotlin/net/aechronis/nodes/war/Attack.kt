@@ -24,6 +24,7 @@ import net.minestom.server.entity.metadata.display.TextDisplayMeta
 import net.minestom.server.timer.Task
 import net.minestom.server.timer.TaskSchedule
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class Attack(
     val attacker: UUID, // attacker's UUID
@@ -152,8 +153,10 @@ class AttackTextDisplay(
     val attack: Attack,
     val loc: Pos,
 ) {
-    // per-player displays
-    val playerTextDisplays: MutableMap<UUID, Entity> = mutableMapOf()
+    // per-player displays -- touched both from FlagWar.attackTick() (this Attack's own scheduled
+    // task thread) and NodesPlayerJoinQuitListener (the joining/quitting player's own thread), so
+    // genuinely concurrent.
+    val playerTextDisplays: MutableMap<UUID, Entity> = ConcurrentHashMap()
 
     // Entities are created lazily, per-player, the first time FlagWar.attackTick() finds them
     // in range -- not eagerly for every online player here. See TEXT_DISPLAY_RANGE_SQUARED in
@@ -175,13 +178,10 @@ class AttackTextDisplay(
      * Update the progress text display with current timer.
      */
     fun update(player: Player) {
-        var textDisplay = playerTextDisplays[player.uuid]
-
-        // create display
-        if (textDisplay == null) {
-            textDisplay = createTextDisplay(loc)
-            playerTextDisplays[player.uuid] = textDisplay
-        }
+        // computeIfAbsent, not get-then-put -- attackTick() and a join/quit event for this same
+        // player can call update() concurrently (see playerTextDisplays' kdoc); a plain
+        // get-then-put here could spawn two entities for one player, orphaning one.
+        val textDisplay = playerTextDisplays.computeIfAbsent(player.uuid) { createTextDisplay(loc) }
 
         // set viewable rule so only this player can see it
         textDisplay.updateViewableRule { viewer -> viewer == player }

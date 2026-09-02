@@ -24,34 +24,48 @@ class IncomeInventory {
     private var updatingInventory = false
     private var visibleSnapshot: Map<Material, Int> = emptyMap()
 
+    // storage/visibleSnapshot/materialized/updatingInventory are one unit of state that must
+    // change together (synchronizeFromInventory's delta compare needs current+old snapshot to
+    // agree, refillVisibleItems needs storage+visibleSnapshot in sync) -- a plain
+    // ConcurrentHashMap on storage alone wouldn't fix that, the read-modify-write spans multiple
+    // fields. add() runs from the periodic income tick (scheduler thread); getInventory()/
+    // synchronizeFromInventory()/snapshot() run when a player opens/interacts with the GUI (that
+    // player's own thread) -- genuinely concurrent on the same Town's IncomeInventory. One lock
+    // is enough: this isn't a per-tick-per-player hot path, just occasional income adds + GUI opens.
+    private val lock = Any()
+
     fun add(
         material: Material,
         amount: Int,
     ) {
         if (amount <= 0) return
-        storage[material] = (storage[material] ?: 0) + amount
-        if (materialized) refillVisibleItems()
+        synchronized(lock) {
+            storage[material] = (storage[material] ?: 0) + amount
+            if (materialized) refillVisibleItems()
+        }
     }
 
-    fun empty(): Boolean {
-        synchronizeFromInventory()
-        return storage.isEmpty()
+    fun empty(): Boolean = synchronized(lock) {
+        synchronizeFromInventoryLocked()
+        storage.isEmpty()
     }
 
-    fun getInventory(): Inventory {
+    fun getInventory(): Inventory = synchronized(lock) {
         if (!materialized) {
             materialized = true
             visibleSnapshot = inventoryCounts()
         } else {
-            synchronizeFromInventory()
+            synchronizeFromInventoryLocked()
         }
         refillVisibleItems()
-        return _inventory
+        _inventory
     }
 
     fun owns(inventory: AbstractInventory): Boolean = inventory === _inventory
 
-    fun synchronizeFromInventory(): Boolean {
+    fun synchronizeFromInventory(): Boolean = synchronized(lock) { synchronizeFromInventoryLocked() }
+
+    private fun synchronizeFromInventoryLocked(): Boolean {
         if (!materialized || updatingInventory) return false
         val current = inventoryCounts()
         if (current == visibleSnapshot) return false
@@ -66,14 +80,14 @@ class IncomeInventory {
         return true
     }
 
-    fun snapshot(): Map<Material, Int> {
-        synchronizeFromInventory()
-        return storage.toMap()
+    fun snapshot(): Map<Material, Int> = synchronized(lock) {
+        synchronizeFromInventoryLocked()
+        storage.toMap()
     }
 
     fun pushToStorage(
         @Suppress("UNUSED_PARAMETER") force: Boolean,
-    ): Boolean = synchronizeFromInventory()
+    ): Boolean = synchronized(lock) { synchronizeFromInventoryLocked() }
 
     private fun refillVisibleItems() {
         val visible = inventoryCounts().toMutableMap()
