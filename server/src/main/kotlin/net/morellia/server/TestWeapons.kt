@@ -250,9 +250,12 @@ object TestWeapons {
     // baked model that way, not via item_model like the older item-model-based guns above. No
     // itemModelEmpty/Reloading/Aiming variant exists yet for this pipeline (see docs/HANDOFF.md --
     // GUI icon and per-state pose swap are still open), so it renders as one fixed model in every
-    // state. maxDamage 10f = 5 hearts (Minestom damage is HP, 1 heart = 2 HP) on a clean hit within
-    // falloffStartRange; real bolt-action stats otherwise -- 5-round magazine, slow single-shot
-    // cooldown/reload, heavy recoil, tight spread.
+    // state. Damage numbers below target hearts *through full leather armor* (7 armor, 0
+    // toughness -- vanilla's armor formula, see DamageFalloff): maxDamage 12.7f = 6 hearts on a
+    // clean hit within 100 blocks, falling off to minDamage 8.9f = 4 hearts by 300 blocks (also
+    // this gun's maxRange -- default 128.0 would've clipped the falloff tail otherwise). Real
+    // bolt-action stats otherwise -- 5-round magazine, slow single-shot cooldown/reload, heavy
+    // recoil, tight spread.
     val kar98k =
         Gun(
             name = "kar98k",
@@ -262,7 +265,8 @@ object TestWeapons {
             customModelDataAiming = "kar98k_lowpoly_aiming",
             ammo = kar98kRound,
             magazineSize = 5,
-            damageFalloff = DamageFalloff(maxDamage = 10f, falloffStartRange = 40.0, falloffEndRange = 120.0, minDamage = 6f),
+            maxRange = 300.0,
+            damageFalloff = DamageFalloff(maxDamage = 12.7f, falloffStartRange = 100.0, falloffEndRange = 300.0, minDamage = 8.9f),
             automatic = false,
             cooldownMs = 1400,
             reloadMs = 2600,
