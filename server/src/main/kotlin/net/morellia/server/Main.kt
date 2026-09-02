@@ -50,7 +50,9 @@ fun main() {
     TestWeapons.register()
     ResourcePack.init()
     TickMonitor.init()
-    LoadTestBots.init()
+    // LoadTestBots.init() -- disabled for the pvp playtest: real players don't need the
+    // TownA/TownB/NationA/NationB bot fixture, and it recreates those towns on every boot
+    // (createTownIfMissing) even after they're wiped from the save data.
     PvpKit.init()
     // Perf profiler -- /spark ..., self-registers its own commands (`.commands(true)`). Same
     // morellia.<node> permission convention as every other admin command here (see TestGunGive's
