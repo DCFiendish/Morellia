@@ -974,19 +974,98 @@ check) before moving to the next.
   written up there yet.
 
 **Still open, straight out of this session:**
-- **`modules/nodes` and `modules/vanilla` have not had the same check-then-act audit
-  `modules/combat` just got.** Now that `dispatcher-threads=4` is live on the VM (real per-chunk
-  parallelism, not the old effectively-sequential default), any plain read-then-write on shared
-  per-player/per-entity state in either module is a live risk, not a theoretical one — this is
-  strictly more urgent than it would have been a day ago. Worth the same kind of pass `modules/combat`
-  just got, focused specifically on state touched by both an event listener and a
-  `MinecraftServer.getSchedulerManager()` task (the exact shape every bug found above had).
+- ~~`modules/nodes` and `modules/vanilla` have not had the same check-then-act audit
+  `modules/combat` just got.~~ **Done — see the next status update.**
 - `modules/utils` (external `net.aechronis:utils` dependency) — flagged since 2026-08-26, still
   true: its post-2026-08-02 upstream history was never audited for fixes worth porting, unlike
   `nodes`/`vanilla`. Separate from the concurrency point above since it's not code this project
   owns directly.
 - The other 7 obj³ guns still have no real `Gun` stats to run a damage-falloff pass on (unchanged
   blocker from the 2026-09-01 entry above).
+
+## Status update (2026-09-02, continued): `nodes`/`vanilla` concurrency audit — the thing flagged above, now done
+
+Direct continuation, same day. Landed as three commits (`35481cc6`, `4fb2b312`, `10a63935`),
+each rebuilt + full test suite + a local server boot check before moving on, then deployed to the
+VM the same way as every jar swap this session (backup + restart + clean-boot log check).
+
+**Method**: for every `object` singleton and domain-object class holding a plain
+`HashMap`/`HashSet`/`LinkedHashMap`/`MutableList`, checked whether it's genuinely touched from more
+than one thread — a per-player command/event handler racing a `MinecraftServer.getSchedulerManager()`
+task, or two different players' command threads touching the same shared instance. Confirmed real
+by tracing actual call sites, not assumed. Where confirmed, swapped to `ConcurrentHashMap`/
+`ConcurrentHashMap.newKeySet()` (matching the pattern `Nodes.territories` already used from an
+earlier session) and `getOrPut`/`containsKey`-then-`put` → `computeIfAbsent`/`compute` where the
+compound check-then-act itself was also unsafe, not just the underlying collection.
+
+**Fixed (`35481cc6`)** — `Nodes.kt` singleton state, all cleared+rebuilt together by `loadWorld()`
+(reachable live via `/nodesadmin load`, `nodes.admin` permission, while players stay connected —
+confirmed via that function's own `finally` block re-creating every online player's
+Resident/minimap afterward): `playerWarpTasks`, `chunkToBuilding`, `resourceNodes`, `towns`,
+`nations`, `residents` (all were plain `HashMap`/`LinkedHashMap` — checked every non-sorted call
+site first, none depend on `LinkedHashMap`'s insertion order), `buildings` (→
+`CopyOnWriteArrayList`, rare writes/frequent reads). Also `vanilla/managers/Combat.kt`'s `tagOne`
+(the same read-then-write cooldown shape as the `modules/combat` gun bug, fixed with
+`ConcurrentHashMap.compute` — a first attempt at deferring via `player.scheduler().scheduleNextTick`
+broke `CombatTest`, since `tag()`'s effects need to be visible synchronously, unlike
+`EnvironmentalDamage.tick()`'s periodic sweep).
+
+**Fixed (`35481cc6`, continued)** — every per-instance collection on `Town`/`Nation` that a
+town/nation-management command mutates: `Town.residents`/`officers`/`territories`/`annexed`/
+`captured`/`protectedBlocks`/`playersOnline` and `Nation.playersOnline`/`towns`/`residents`/
+`allies`/`enemies` → `ConcurrentHashMap.newKeySet()`; `Town.plots`/`applications` → `ConcurrentHashMap`.
+Real, confirmed reachable: two members of the *same* town, standing in different chunks (different
+threads under `dispatcher-threads=4`), each running a town command at once.
+
+**Checked and found already safe, no fix (`4fb2b312`)** — `Territory`/`ResourceNode`'s
+`income`/`ores`/multiplier maps: both build a fresh result via functional copy-and-return
+(`TerritoryResources.accumulateNeighborModifiers`/`applyNeighborModifiers`,
+`ResourceAttribute.apply`) and are never mutated in place after construction — confirmed via grep,
+no write sites outside their own builders, same pattern already established for `Territory`'s own
+`@Volatile var town`/`occupier`.
+
+**Fixed (`4fb2b312`)** — `Plot.groupPermissions`/`playerPermissions` (nested maps): read on every
+protected-block interact (any chunk thread), written from town permission commands (the acting
+player's thread) → `ConcurrentHashMap` for both outer and inner maps, `getOrPut` →
+`computeIfAbsent` to close the outer-map TOCTOU too.
+
+**Fixed (`10a63935`)** — swept the remaining `getSchedulerManager` users in both modules (~26 files
+checked total): `Alliance.requests`/`requestTimers` (ally-request offers, touched by either
+nation's command thread + the request's own timeout task), `Attack.playerTextDisplays` (war-attack
+per-player name displays — touched by `FlagWar.attackTick()`'s own scheduled task *and*
+`NodesPlayerJoinQuitListener`, plus `getOrPut` → `computeIfAbsent` since a concurrent double-create
+would leak a duplicate entity), `Chat.playersMuteGlobal` (any player's mute-toggle thread vs. every
+chat-message thread), `Koth.active`/`deadPlayers` + `ActiveKoth.bossBars`/`visibleTo` (`/koth`
+command thread vs. the KOTH scheduled tick, and `KothListener`'s death/respawn/quit handlers vs.
+`isInside()`'s check from another player's thread) — all → `ConcurrentHashMap`/`.newKeySet()`.
+Caught a real Kotlin compiler error along the way: `name in active`/`name !in active` on a
+`ConcurrentHashMap`-typed field is ambiguous (KT-18053, resolves to `containsValue` instead of
+`containsKey`) — switched to explicit `.containsKey()`.
+
+**Fixed (`10a63935`, the one non-collection-swap fix)** — `IncomeInventory` (`Town.income`): its
+`storage` map, `visibleSnapshot`, and `materialized`/`updatingInventory` flags all have to change
+together (the GUI-diff logic in `synchronizeFromInventory` compares current vs. old snapshot, then
+writes both), so a `ConcurrentHashMap` on `storage` alone wouldn't have fixed it — the periodic
+income tick (`add()`) and a player opening/interacting with the income GUI
+(`getInventory()`/`synchronizeFromInventory()`) are genuinely different threads on the same `Town`
+instance. Wrapped every public method in one `synchronized` lock instead — not a hot per-tick-
+per-player path, so one coarse lock is enough.
+
+**Checked and left alone, confirmed already correct or genuinely low-risk**: `Resident`/`Nametag`/
+`Minimap`/`WaypointMenu` (nodes) and `Warp`/`Saplings`/`Storage`/`PlayerData`/`Food`/`Crops`
+(vanilla) already use `ConcurrentHashMap`/`.newKeySet()`; `Music.kt`'s disc-registry maps and
+`Koth`'s `definitions`/`schedules`/`scheduledRuns` are only ever written once at boot or from a
+single repeating task's own thread, never concurrently; `Resident.teleportThread`/`inviteThread`
+are plain `var Task?` references (a JVM reference write doesn't tear, so the worst case is losing
+track of a task to cancel — a minor leak, not the structural-corruption class every fix above
+addressed) — deliberately not touched.
+
+**Not done**: no dedicated regression test was written for any of these races (they're all
+timing-dependent by nature — hard to assert deterministically without a stress-test harness this
+session didn't build). Verification was build + existing test suite (only the pre-existing
+`ore sampler`/Windows-file-lock/`MovementAntiCheatTest` flakes, reproduced identically against each
+unmodified baseline via `git stash` before trusting them as pre-existing) + a clean local boot with
+real `morellia-data/nodes` world data loaded (2 towns/2 nations/plots) before each deploy.
 
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
