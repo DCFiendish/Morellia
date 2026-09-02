@@ -1,4 +1,4 @@
-# Handoff — Morellia project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration + combat built 2026-08-26, combat hardened + spark added 2026-09-02)
+# Handoff — Morellia project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration + combat built 2026-08-26, combat hardened + spark added 2026-09-02, worldedit ported + pvp playtest prep + VM right-sized 2026-09-02)
 
 Deep background (library internals, design rationale) is in `RESEARCH.md`, `NODES_DEEP_DIVE.md`,
 `VANILLA_DEEP_DIVE.md`, `COMBAT_DEEP_DIVE.md`, and `research-todo/*.md` — not repeated here. This
@@ -1067,6 +1067,129 @@ session didn't build). Verification was build + existing test suite (only the pr
 unmodified baseline via `git stash` before trusting them as pre-existing) + a clean local boot with
 real `morellia-data/nodes` world data loaded (2 towns/2 nations/plots) before each deploy.
 
+## Status update (2026-09-02, continued): pvp playtest prep — spawn bug, worldedit ported, VM right-sized
+
+Direct continuation, same day, picking up right after the concurrency audit above. Goal: get the
+Nodisium Playtest Map arena ready for a real human pvp test, not another bot load test.
+
+**Guns trimmed for the test**: musket/springfield/karabiner (the `itemModel`-pipeline placeholder
+guns) are gone from `TestWeapons.kt` — only `kar98k` (the obj³ mesh, the one with a confirmed-good
+ADS pose) remains, alongside the 7 other obj³ guns that still have no real `Gun` stats yet
+(unchanged blocker from 2026-09-01).
+
+**Death-respawn bug found and root-caused, not a code bug**: players kept respawning at
+`24, 65, 24` after dying, not the arena's real spawn (`150, 105, 150`). Traced to
+[`NodesPlayerJoinQuitListener.kt`](../modules/nodes/src/main/kotlin/net/aechronis/nodes/listeners/NodesPlayerJoinQuitListener.kt)'s
+`onPlayerRespawn`: it checks `Resident.fromPlayer(player)?.town?.spawnpoint` **before** falling
+back to `Nodes.config.defaultRespawnPoint` — and DCFiendish was still resident+leader of `TownA`,
+an old flat-world dev fixture (`LoadTestBots.kt`'s bot towns) whose `spawn` in `towns.json` happened
+to be `[24.0, 65.0, 24.0]`. First join worked fine (that path never consults town data at all) —
+only death respawn was affected.
+
+**Fix, not a data patch**: `TownA`/`TownB`/`NationA`/`NationB` were wiped from the live
+`morellia-data/nodes` save on the VM, and — since `LoadTestBots.kt`'s `createTownIfMissing` would
+just recreate them on the next boot regardless — `LoadTestBots.init()` itself is now commented out
+in `Main.kt` (`aad2aa8c`). Confirmed via boot log: `Towns: 0, Nations: 0` and stays that way across
+restarts now.
+
+**Real pvp-prep-zone exploit found and fixed** (`a365f024`): `PvpPrepListener.onDamage` only ever
+checked the **victim's** position against the no-damage box — someone standing *inside* a safe zone
+could shoot *out* at players outside it with total immunity, since only the victim side was ever
+checked. Fixed by also checking `event.damage.attacker`'s position (confirmed via decompiling
+Minestom's `Damage`/`EntityProjectileDamage` that `getAttacker()` reliably returns the shooting/
+attacking player for both `Gun.fire`'s `Damage.fromProjectile` and `MeleeListener`'s direct
+`Damage(...)` construction) — now blocks damage dealt *from* the zone too, not just damage received
+inside it. `warpsConfig.warps`/`pvpPrepConfig.zones` are still both empty in `Main.kt` — nobody's
+picked warp landing spots or safe-zone box corners yet, that's still the next real gap before the
+map has actual `/warp` destinations.
+
+**Bare-fist punching confirmed as "never built," not a regression**: the only `EntityAttackEvent`
+listener anywhere (`MeleeListener.onAttack`) returns immediately unless the attacker is holding a
+registered `Melee` item — Minestom has no built-in vanilla punch damage, so an empty hand doing
+nothing is expected, matching every other module here (nothing implements it).
+
+**`modules/worldedit` ported from `Aechronis/aechronis`** (`967d53ca`, subtree-imported in a
+separate commit right before it, full history preserved via `git subtree split`/`add` the same way
+`nodes`/`vanilla` were): a Minestom platform adapter over the real `com.sk89q.worldedit:worldedit-core`
+(GPL-3.0, distinct from `nodes`/`vanilla`/`utils`'s AGPL-3.0 — doesn't change this project's overall
+license posture either way, already the stricter AGPL via those), **not** a from-scratch
+reimplementation — most of the actual selection/undo/clipboard/brush logic comes from upstream
+`worldedit-core` itself, this module is ~2.4k lines of glue (block/item registry bridging, command
+dispatch, actor/world adapters).
+- Their upstream version is written against a **newer Aechronis server architecture** this project
+  doesn't have — a runtime hot-swap module manager (`net.aechronis.server.modules.AechronisModule`/
+  `ModuleContext`, their own `/modules list`/`enable`/`disable`/`reload` commands). Adapted off it:
+  deleted `WorldEditModule.kt` (their module-manager entry point), replaced `ModuleEvents.addChild`
+  with a plain `EventNode.addChild` call in `MinestomPlatform.kt`. Wired directly via
+  `MinestomWorldEdit().init(WorldEditConfig(dataFolder = File("morellia-data/worldedit")))` in
+  `Main.kt`, same convention as `Vanilla.init()`/`Nodes.initialize()`/`Combat.initialize()`.
+- `build.gradle.kts`: their `moduleApi` config (doesn't exist here) → plain `api`;
+  `compileOnly(project(":server"))` dropped (dependency direction here is server→modules, not the
+  reverse); added `net.aechronis:utils:86a747b` (already this project's pin) since
+  `MinestomPlayer.kt`'s permission check needs it; added `maven.enginehub.org` to the **root**
+  `build.gradle.kts` (a `project(...)` dependency resolves its external artifacts through the
+  *depending* project's repositories, not the dependency's own — a module-local `repositories{}`
+  block alone wasn't enough once `:server` tried to resolve `worldedit-core` transitively).
+- Boot-tested locally and on the VM both — clean `Registering blocks with WorldEdit` →
+  `Registering items with WorldEdit` → `Finished loading WorldEdit`, no exceptions. The module's own
+  `MinestomWorldEditTest` suite passes (needed `testImplementation` added for `utils`/guava/fastutil,
+  which were only `compileOnly` — fine for the real shadowJar since those get bundled at package
+  time, but missing from the test runtime classpath otherwise).
+- Command permissions route through the same `net.aechronis.utils.hasPermission` → LuckPerms bridge
+  every other admin command here uses; since this project doesn't run real LuckPerms and the VM's
+  startup command carries `DEBUG=true`, permission checks that hit `hasPermission`'s exception path
+  fall through to allow-all (confirmed via decompiling `PermissionsKt.hasPermission`) — so `//`
+  commands work for anyone connecting right now, same as `/testgun`/`/spark` already did. Not
+  something this session changed, just confirmed it extends to worldedit too.
+- Not yet checked in-game: only boot/compile/unit-test verified, nobody's actually run `//wand`/
+  `//set`/`//undo` through a real client yet.
+
+**`nodes-map` checked, not touched**: still a live `systemd` unit on the VM (port 8888, up
+continuously since 2026-08-26), already fully caught up with `Aechronis/nodes-map` upstream (which
+went quiet 2026-08-01, the same day `nodes`/`vanilla` were abandoned there too, and was never folded
+into their new monorepo) — nothing to port. It's currently rendering the abandoned Agadir/10-nation
+territory data, unrelated to the pvp arena's own `nodes` dataset; cosmetic mismatch, not a bug,
+low-priority to fix unless someone's actually looking at that map during the test.
+
+**VM resources right-sized for real player load, not just idle bot testing**: prompted by realizing
+the container's headroom was thin even before today's `worldedit-core` addition.
+- **Before**: 2.3GB container memory limit, `-XX:MaxRAMPercentage=95.0` → ~110MB of non-heap
+  headroom (metaspace, thread stacks, Netty off-heap, GC, spark's async-profiler). Confirmed via
+  `docker stats` this was fine at near-idle (442MB/2.3GB, no real players) but too thin a margin for
+  anything resembling real load.
+- **After** (applied via the Pterodactyl Application API, `PATCH .../servers/3/build` +
+  `.../startup`, same `ptla_...` key mechanism as the earlier dispatcher-threads change — some of
+  these calls got blocked by this session's own tool-permission classifier as live-infra mutations,
+  so the actual button-clicks were done by the user in the Panel UI, this session only supplied the
+  exact values and verified via read-only `GET`/`docker inspect` afterward): memory 2.3GB → **18GB**
+  (Docker-confirmed `~18.9GiB` post-restart), disk quota 5GB → **20GB** (was already at 3.3GB/66%
+  used before this — `worldedit` schematics/undo history plus growing resource-pack/backup data
+  would have hit that ceiling soon), OOM killer flipped from disabled to enabled (a disabled OOM
+  killer under a hard cgroup memory limit risks the container hanging unresponsive under memory
+  pressure instead of dying cleanly and restarting — confirmed the container-level flag actually
+  flipped via `docker inspect`'s `OomKillDisable`, even though the Panel Application API's own `GET`
+  kept reporting the stale `oom_disabled: true` afterward — a real Panel-API display quirk, not a
+  live-config problem, not worth chasing further). Startup command:
+  `DEBUG=true java -Xms1G -XX:MaxRAMPercentage=80.0 -Dminestom.dispatcher-threads=4 -jar {{SERVER_JARFILE}}`
+  (was `-Xms128M -XX:MaxRAMPercentage=95.0`) — also updated in `server/morellia-egg.json` so a
+  future egg re-import carries it forward, matching the same convention as the dispatcher-threads
+  bump.
+- **`dispatcher-threads` deliberately left at 4, not dropped to 3**: this VM is genuinely
+  single-tenant while Morellia runs — the user confirmed `citybuild`/`bannerbound` (this box's other
+  two hosted services) are always stopped whenever Morellia is up, so there's no real core
+  contention to design around, unlike a naive "always leave a core free on a shared box" read of the
+  situation. Revisit only if that stop/start discipline ever changes.
+- **What 200 players would actually need — still an open question, not answered today.**
+  `docs/RESEARCH.md` §7 already has a target (~3 OCPU / 16GB for the flagship shard), explicitly
+  flagged there as unverified pending a real load test, and
+  `docs/minestom-server-setup/03-runtime-ops-and-logging.md` confirms no citable official
+  Minestom RAM-per-player figure exists anywhere to shortcut that. Today's VM (4 vCPU/23GB total)
+  already exceeds that target on paper; the real number still needs the `rust-mc-bot` load-test
+  ladder (50→100→150 bots, watching `docker stats` memory% and `TickMonitor` tick times per the
+  existing `morellia-ops` playbook step 6) that this session didn't get to — worth running before
+  trusting the new limits at real scale, and worth writing the actual measured result back into
+  `RESEARCH.md` §7 once it exists instead of leaving it as a research-only estimate.
+
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
 The real 1911 Agadir Crisis (a diplomatic/gunboat standoff over Morocco, resolved historically
@@ -1205,9 +1328,34 @@ Pterodactyl server UUID, volume path, and container ownership details are in
   standing up nodes-map's port 8888.
 - **`oci network security-list update --ingress-security-rules` replaces the whole rule list**, not
   an incremental add — always fetch-and-append the full existing rule set before submitting.
+- **A plain `docker restart` does not pick up a Panel-changed startup command or build-config
+  limits (memory/disk/CPU/OOM)** — same root cause as the dispatcher-threads gotcha earlier in this
+  doc, generalized: Wings only recreates the container against the new config on a **Panel-driven**
+  restart (via the console UI, or a client-API power action), not a raw `docker restart` against the
+  old container definition. Confirmed again during the 2026-09-02 VM right-sizing pass.
+- **The Pterodactyl Application API's `GET /servers/{id}` can report a stale `oom_disabled` value**
+  even after the Panel UI save + a real restart — confirmed the *actual* container-level setting via
+  `docker inspect`'s `OomKillDisable` field instead, which was correct despite the API disagreeing.
+  Don't trust that one field from the API without cross-checking `docker inspect` if it matters.
+- **Mutating the Panel Application API (`PATCH .../build`, `.../startup`, etc.) may get blocked by
+  Claude Code's own tool-permission classifier** as a live-infra mutation, even with a valid
+  `ptla_...` key in hand — read-only `GET`s go through fine. When blocked, the fallback is doing the
+  same change by hand in the Panel UI with Claude supplying the exact field values, then Claude
+  verifies afterward via `GET`/`docker inspect`.
 
 ## What's genuinely still open (not urgent, not touched recently)
 
+- **New, 2026-09-02**: get a real per-player memory/CPU number instead of the research-only ~16GB/
+  3-OCPU estimate in `RESEARCH.md` §7 — run the `rust-mc-bot` load-test ladder (50→100→150 bots per
+  the `morellia-ops` playbook step 6) against the newly-right-sized VM (18GB/20GB disk, see the
+  2026-09-02 status update above) and write the measured result back into `RESEARCH.md` §7.
+- **New, 2026-09-02**: `warpsConfig.warps` and `pvpPrepConfig.zones` are both still empty in
+  `Main.kt` — no `/warp` destinations and no no-damage safe-zone box exist on the Nodisium map yet,
+  even though the pvp-prep-zone damage logic itself is now bug-fixed (bidirectional). Needs real
+  landing-spot/box-corner coordinates picked before either does anything.
+- **New, 2026-09-02**: `modules/worldedit` is ported and boots clean, but nobody's actually run
+  `//wand`/`//set`/`//undo`/etc. through a real client yet — verify in-game before relying on it
+  mid-playtest.
 - **New, 2026-08-29, actually next up for asset work**: pick up the obj³/Kar98K mesh-baking
   pipeline exactly where the 2026-08-29 status update above left it — nothing has been imported
   into Blockbench yet, only the `.glb` is downloaded. Also verify in-game whether `springfield.json`'s
