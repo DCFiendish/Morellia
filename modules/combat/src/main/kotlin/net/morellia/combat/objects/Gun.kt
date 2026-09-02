@@ -93,6 +93,10 @@ class Gun(
         require(spreadMax >= spreadMin) { "spreadMax must be >= spreadMin" }
         require(sprintSpreadMultiplier >= 1f) { "sprintSpreadMultiplier must be >= 1" }
         require(pelletCount > 0) { "pelletCount must be > 0" }
+        require(damageFalloff.falloffEndRange <= maxRange) {
+            "damageFalloff.falloffEndRange (${damageFalloff.falloffEndRange}) must be <= maxRange ($maxRange) -- " +
+                "fire()'s hitscan ray never travels past maxRange, so a falloff tail beyond it can never apply"
+        }
     }
 
     /** Reads remaining ammo from [stack]'s durability-bar encoding (see [setAmmo]). */
@@ -196,8 +200,6 @@ class Gun(
     fun fire(player: Player): Boolean {
         val instance = player.instance ?: return false
         val now = System.currentTimeMillis()
-        val lastFire = Combat.playerLastFireTimes[player]
-        if (lastFire != null && lastFire.first === this && now - lastFire.second < cooldownMs) return false
         if (Combat.reloadTasks.containsKey(player)) return false
 
         val stack = player.itemInMainHand
@@ -207,7 +209,7 @@ class Gun(
         }
         if (usableZones.isNotEmpty() && usableZones.none { it(instance, player.position) }) return false
 
-        Combat.playerLastFireTimes[player] = this to now
+        if (!Combat.tryStartFireCooldown(player, this, now)) return false
 
         val crouching = player in Combat.aimingPlayers
         val moving = player in Combat.movingPlayers

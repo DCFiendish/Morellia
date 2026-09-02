@@ -21,9 +21,7 @@ object MeleeListener {
 
         val now = System.currentTimeMillis()
         val cooldownMs = (1000.0 / melee.attackSpeed).toLong()
-        val lastAttack = Combat.meleeLastAttackTimes[attacker]
-        if (lastAttack != null && lastAttack.first === melee && now - lastAttack.second < cooldownMs) return
-        Combat.meleeLastAttackTimes[attacker] = melee to now
+        if (!Combat.tryStartMeleeCooldown(attacker, melee, now, cooldownMs)) return
 
         target.damage(Damage(DamageType.PLAYER_ATTACK, attacker, attacker, null, melee.damage.toFloat()))
     }

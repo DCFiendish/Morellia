@@ -61,6 +61,55 @@ object Combat {
         ModelRefreshTask.start()
     }
 
+    /**
+     * Atomically checks [weapon]'s per-player cooldown in [map] and, if it has elapsed (or there's
+     * no prior entry, or the prior entry was for a *different* weapon), records [now] as the new
+     * last-fire/last-attack time and returns true. Shared by Gun.fire's cooldown and MeleeListener's
+     * attack-speed gate -- both need the exact same "is this weapon off cooldown for this player"
+     * check against a Pair<Weapon, Long> map.
+     *
+     * Uses ConcurrentHashMap.compute, not a separate read-then-write (get + put), specifically
+     * because a plain check-then-set here is a real TOCTOU race under this project's threading
+     * model (see this object's kdoc): an automatic gun's scheduled auto-fire task and a fresh
+     * PlayerHandAnimationEvent for the same player can land close enough together that both would
+     * read the map before either wrote to it, letting the same gun fire twice inside one
+     * cooldownMs window. compute()'s remapping function runs atomically per key, so the read and
+     * the write happen as one indivisible step.
+     */
+    private fun <T : Any> tryStartCooldown(
+        map: ConcurrentHashMap<Player, Pair<T, Long>>,
+        player: Player,
+        weapon: T,
+        now: Long,
+        cooldownMs: Long,
+    ): Boolean {
+        var started = false
+        map.compute(player) { _, existing ->
+            if (existing != null && existing.first === weapon && now - existing.second < cooldownMs) {
+                existing
+            } else {
+                started = true
+                weapon to now
+            }
+        }
+        return started
+    }
+
+    /** See [tryStartCooldown] -- returns false without recording anything if [gun]'s cooldown for [player] hasn't elapsed. */
+    internal fun tryStartFireCooldown(
+        player: Player,
+        gun: Gun,
+        now: Long,
+    ): Boolean = tryStartCooldown(playerLastFireTimes, player, gun, now, gun.cooldownMs)
+
+    /** See [tryStartCooldown] -- returns false without recording anything if [melee]'s attack-speed cooldown for [player] hasn't elapsed. */
+    internal fun tryStartMeleeCooldown(
+        player: Player,
+        melee: Melee,
+        now: Long,
+        cooldownMs: Long,
+    ): Boolean = tryStartCooldown(meleeLastAttackTimes, player, melee, now, cooldownMs)
+
     /** Drops every per-player entry -- called on disconnect so state maps don't grow unbounded. */
     internal fun clearPlayer(player: Player) {
         playerLastFireTimes.remove(player)

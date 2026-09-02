@@ -59,12 +59,21 @@ object AimingListener {
      * edge fires on a hotbar swap, so [startAiming] never re-runs on its own), re-applies the aim
      * effects using the new gun's own adsZoomStrength/adsVignette instead of leaving the old gun's
      * values stuck on.
+     *
+     * Passes [PlayerChangeHeldSlotEvent.getItemInNewSlot] down to [applyAimEffects] instead of
+     * letting it read player.itemInMainHand itself -- confirmed against Minestom's own
+     * PlayerHeldListener (the packet handler that fires this event): it constructs the event from
+     * the *old* held slot and only calls Player.setHeldItemSlot afterward, once the event returns
+     * uncancelled. So at the time this listener runs, player.itemInMainHand is still the outgoing
+     * gun's stack, not the new one -- reading it here for e.g. the ammo-gated vignette check would
+     * silently show/hide the scope based on the wrong weapon.
      */
     private fun onHeldSlotChange(event: PlayerChangeHeldSlotEvent) {
         val player = event.player
         if (player !in Combat.aimingPlayers) return
-        val newGun = Item.getFromItemStack(event.getItemInNewSlot()) as? Gun
-        if (newGun == null) stopAiming(player) else applyAimEffects(player, newGun)
+        val newStack = event.getItemInNewSlot()
+        val newGun = Item.getFromItemStack(newStack) as? Gun
+        if (newGun == null) stopAiming(player) else applyAimEffects(player, newGun, newStack)
     }
 
     private fun startAiming(
@@ -72,18 +81,19 @@ object AimingListener {
         gun: Gun,
     ) {
         if (!Combat.aimingPlayers.add(player)) return
-        applyAimEffects(player, gun)
+        applyAimEffects(player, gun, player.itemInMainHand)
     }
 
-    /** (Re-)applies [gun]'s zoom/vignette to [player], replacing whichever gun's values were active before. */
+    /** (Re-)applies [gun]'s zoom/vignette to [player] using [stack] (the gun's own item), replacing whichever gun's values were active before. */
     private fun applyAimEffects(
         player: Player,
         gun: Gun,
+        stack: ItemStack,
     ) {
         val speedAttribute = player.getAttribute(Attribute.MOVEMENT_SPEED)
         speedAttribute.removeModifier(AIM_SPEED_MODIFIER_ID)
         speedAttribute.addModifier(AttributeModifier(AIM_SPEED_MODIFIER_ID, -gun.adsZoomStrength, AttributeOperation.ADD_MULTIPLIED_TOTAL))
-        val helmet = if (gun.adsVignette && gun.hasAmmo(player.itemInMainHand)) SCOPE_VIGNETTE_HELMET else player.helmet
+        val helmet = if (gun.adsVignette && gun.hasAmmo(stack)) SCOPE_VIGNETTE_HELMET else player.helmet
         player.sendPacket(EntityEquipmentPacket(player.entityId, mapOf(EquipmentSlot.HELMET to helmet)))
         gun.refreshModel(player)
     }

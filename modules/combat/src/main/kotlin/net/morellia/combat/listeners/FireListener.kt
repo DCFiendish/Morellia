@@ -36,13 +36,17 @@ object FireListener {
         if (gun.automatic) startAutoFireIfNeeded(player, gun)
     }
 
+    /**
+     * Uses computeIfAbsent, not containsKey-then-put, so two swing events arriving close together
+     * for the same player can't both pass the "no task yet" check before either registers one --
+     * that race would start two overlapping auto-fire loops for one trigger hold (same TOCTOU
+     * class as the cooldown race fixed in Combat.tryStartCooldown; see its kdoc).
+     */
     private fun startAutoFireIfNeeded(
         player: Player,
         gun: Gun,
     ) {
-        if (Combat.autoFireTasks.containsKey(player)) return
-
-        val task =
+        Combat.autoFireTasks.computeIfAbsent(player) {
             MinecraftServer
                 .getSchedulerManager()
                 .buildTask {
@@ -57,8 +61,7 @@ object FireListener {
                     gun.fire(player)
                 }.repeat(TaskSchedule.millis(gun.cooldownMs))
                 .schedule()
-
-        Combat.autoFireTasks[player] = task
+        }
     }
 
     fun init() {
