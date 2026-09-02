@@ -8,26 +8,27 @@ import net.aechronis.vanilla.VanillaConfig
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.Pos
+import net.minestom.server.instance.anvil.AnvilLoader
 import net.morellia.combat.Combat
+import java.nio.file.Path
 
 fun main() {
-    // Real terrain test boot: WorldPainter-authored Agadir Crisis map (see AgadirWorld.kt and
-    // docs/HANDOFF.md). StoneFlatTerrain.generator still covers any chunk outside the imported
-    // box so the world never has unrendered holes. The imported world isn't centered on the
-    // origin -- it occupies exactly block X:[0,3583] Z:[0,3711] (confirmed by scanning the
-    // exported .mca region files' chunk headers directly, not just which region files exist --
-    // the naive region-file-count estimate overshot Z by ~384 blocks since the last region row
-    // is only partially populated) -- so spawn is the box's true center, not (0,0). High above
-    // y=210 (our authored ceiling) so the player free-falls onto real terrain; not yet tuned to
-    // a specific real-world landmark.
-    val spawnPoint = Pos(1791.5, 250.0, 1855.5)
+    // Pvp playtest boot: the Nodisium Playtest Map (a purpose-built arena, not the Agadir Crisis
+    // terrain -- see AgadirWorld.kt for that one, still available, just not attached below).
+    // StoneFlatTerrain.generator still covers any chunk outside the imported box so the world
+    // never has unrendered holes. Spawn point per the map author.
+    val spawnPoint = Pos(150.0, 105.0, 150.0)
     val instance = createTestServer(
         generator = StoneFlatTerrain.generator,
         spawnPoint = spawnPoint,
         auth = Auth.Offline(),
         port = 25567,
     )
-    AgadirWorld.attach(instance)
+    // The map was exported with the datapack-style dimension layout (dimensions/minecraft/overworld/region/...)
+    // rather than the standard single-player format (region/ at the root), so AnvilLoader needs the
+    // overworld subfolder directly -- pointing it at the map root finds no region/ and silently falls
+    // back to StoneFlatTerrain.generator for every chunk.
+    instance.setChunkLoader(AnvilLoader(Path.of("morellia-data/nodisium-playtest-map/dimensions/minecraft/overworld")))
     instance.setChunkSupplier(::FullbrightChunk)
     // TODO(pvp playtest): warpsConfig.warps and pvpPrepConfig.zones are empty by default (same as
     // kothsConfig above them) -- add real WarpPoint/PrepZoneConfig entries here, each referencing
@@ -37,7 +38,10 @@ fun main() {
     // territories are wilderness-bordering AND each town's home, so wasteland (2x) and home (2x)
     // multipliers stack: actual capture time = chunkAttackTime(ms) * 0.004. 7500ms -> 30s actual.
     // Revert toward defaults before anything resembling live play.
-    Nodes.initialize(NodesConfig(path = "morellia-data/nodes", chunkAttackTime = 7500))
+    // defaultRespawnPoint governs where townless players land on death (PlayerRespawnEvent),
+    // separately from the instance's own spawnPoint above which only applies on first join --
+    // without this it defaults to (0,64,0), off the edge of the Nodisium map.
+    Nodes.initialize(NodesConfig(path = "morellia-data/nodes", chunkAttackTime = 7500, defaultRespawnPoint = spawnPoint))
     Combat.initialize()
     TestWeapons.register()
     ResourcePack.init()

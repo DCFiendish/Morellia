@@ -43,7 +43,11 @@ object MannequinListener {
 
         val corpse = EntityCreature(EntityType.MANNEQUIN)
         corpse.editEntityMeta(MannequinMeta::class.java) { meta ->
-            meta.profile = ResolvableProfile(player.skin)
+            // player.skin is null for offline-mode/fake-login sessions (e.g. the local dev
+            // client) -- ResolvableProfile(PlayerSkin) unconditionally calls skin.textures()
+            // and NPEs on that, so this fell through the whole onDeath body (never registering
+            // the corpse, never clearing the inventory) every time such a player died.
+            meta.profile = player.skin?.let { ResolvableProfile(it) } ?: ResolvableProfile.EMPTY
         }
 
         val loot = Mannequin.newLootInventory(player.username)
