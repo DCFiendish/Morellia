@@ -41,7 +41,7 @@ fun main() {
     // defaultRespawnPoint governs where townless players land on death (PlayerRespawnEvent),
     // separately from the instance's own spawnPoint above which only applies on first join --
     // without this it defaults to (0,64,0), off the edge of the Nodisium map.
-    Nodes.initialize(NodesConfig(path = "morellia-data/nodes", chunkAttackTime = 7500, defaultRespawnPoint = spawnPoint, canInteractInEmpty = false, canInteractInUnclaimed = false))
+    Nodes.initialize(NodesConfig(path = "morellia-data/nodes", chunkAttackTime = 7500, defaultRespawnPoint = spawnPoint, canInteractInEmpty = false, canInteractInUnclaimed = false, adminUsernames = setOf("DCFiendish")))
     Combat.initialize()
     TestWeapons.register()
     ResourcePack.init()

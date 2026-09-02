@@ -54,6 +54,7 @@ object NodesWorldListener {
         if (event.isCancelled) return
 
         val player: Player = event.player
+        if (Nodes.config.adminUsernames.contains(player.username)) return
         val blockPos = event.blockPosition
         val territoryChunk = TerritoryChunk.fromBlock(blockPos.blockX, blockPos.blockZ)
 
@@ -167,6 +168,7 @@ object NodesWorldListener {
         val block = event.block
         val blockPos = event.blockPosition
         val player: Player = event.player
+        if (Nodes.config.adminUsernames.contains(player.username)) return
 
         // war specific tasks
         if (FlagWar.enabled) {

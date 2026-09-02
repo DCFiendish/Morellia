@@ -168,6 +168,10 @@ data class NodesConfig(
     // allow leaving towns/natiosn during war
     val canLeaveTownDuringWar: Boolean = false,
 
+    // usernames that bypass all break/place permission checks. Empty by default --
+    // must be explicitly configured per-deploy, never on for the default player.
+    val adminUsernames: Set<String> = emptySet(),
+
     // war whitelist: only allow attacking these town UUIDs
     val warWhitelist: Set<UUID> = emptySet(),
 
