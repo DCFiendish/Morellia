@@ -6,6 +6,7 @@ import net.aechronis.nodes.constants.PermissionsGroup
 import net.aechronis.nodes.constants.TownPermissions
 import net.aechronis.nodes.serdes.SaveState
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class Plot(
     val name: String,
@@ -85,8 +86,11 @@ class Plot(
     val maxY: Int = maxOf(cornerOne.y, cornerTwo.y)
     val maxZ: Int = maxOf(cornerOne.z, cornerTwo.z)
 
-    private val groupPermissions: MutableMap<PermissionsGroup, MutableMap<TownPermissions, Boolean>> = hashMapOf()
-    private val playerPermissions: MutableMap<UUID, MutableMap<TownPermissions, Boolean>> = hashMapOf()
+    // groupPermission()/playerPermission() read on every protected-block interact (any chunk
+    // thread); setGroupPermission()/setPlayerPermission() write from a town command (the acting
+    // player's own thread) -- same cross-thread shape as Town/Nation's fields.
+    private val groupPermissions: MutableMap<PermissionsGroup, MutableMap<TownPermissions, Boolean>> = ConcurrentHashMap()
+    private val playerPermissions: MutableMap<UUID, MutableMap<TownPermissions, Boolean>> = ConcurrentHashMap()
 
     private var saveState: PlotSaveState = PlotSaveState(this)
     private var needsUpdate = true
@@ -97,10 +101,10 @@ class Plot(
         BlockVec3(state.maxX, state.maxY, state.maxZ),
     ) {
         state.groupPermissions.forEach { (group, permissions) ->
-            groupPermissions[group] = permissions.toMutableMap()
+            groupPermissions[group] = ConcurrentHashMap(permissions)
         }
         state.playerPermissions.forEach { (player, permissions) ->
-            playerPermissions[player] = permissions.toMutableMap()
+            playerPermissions[player] = ConcurrentHashMap(permissions)
         }
         saveState = state
         needsUpdate = false
@@ -124,7 +128,7 @@ class Plot(
             groupPermissions[group]?.remove(permission)
             if (groupPermissions[group]?.isEmpty() == true) groupPermissions.remove(group)
         } else {
-            groupPermissions.getOrPut(group) { hashMapOf() }[permission] = value
+            groupPermissions.computeIfAbsent(group) { ConcurrentHashMap() }[permission] = value
         }
         needsUpdate()
     }
@@ -134,7 +138,7 @@ class Plot(
             playerPermissions[player]?.remove(permission)
             if (playerPermissions[player]?.isEmpty() == true) playerPermissions.remove(player)
         } else {
-            playerPermissions.getOrPut(player) { hashMapOf() }[permission] = value
+            playerPermissions.computeIfAbsent(player) { ConcurrentHashMap() }[permission] = value
         }
         needsUpdate()
     }
