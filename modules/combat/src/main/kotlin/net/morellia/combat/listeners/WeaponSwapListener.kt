@@ -2,6 +2,7 @@ package net.morellia.combat.listeners
 
 import net.minestom.server.event.player.PlayerSwapItemEvent
 import net.morellia.combat.Combat
+import net.morellia.combat.objects.Gun
 import net.morellia.combat.objects.Item
 
 /**
@@ -10,12 +11,15 @@ import net.morellia.combat.objects.Item
  * on an idle item could be F-swapped in for an instant full-power first hit. Cancelling the swap
  * outright while holding any combat item closes the vector entirely: there's no swap to exploit if
  * it never happens.
+ *
+ * The offhand-swap key doubles as a manual reload trigger for guns: [ReloadListener.tryStartReload]
+ * already no-ops on a full magazine or an in-progress reload, so this is safe to call unconditionally.
  */
 object WeaponSwapListener {
     private fun onSwap(event: PlayerSwapItemEvent) {
-        if (Item.getFromItemStack(event.player.itemInMainHand) != null) {
-            event.isCancelled = true
-        }
+        val item = Item.getFromItemStack(event.player.itemInMainHand) ?: return
+        event.isCancelled = true
+        if (item is Gun) ReloadListener.tryStartReload(event.player, item)
     }
 
     fun init() {

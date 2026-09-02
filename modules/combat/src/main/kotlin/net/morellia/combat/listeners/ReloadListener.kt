@@ -26,7 +26,7 @@ object ReloadListener {
         if (!gun.hasAmmo(player.itemInMainHand)) tryStartReload(player, gun)
     }
 
-    private fun tryStartReload(
+    fun tryStartReload(
         player: Player,
         gun: Gun,
     ) {
