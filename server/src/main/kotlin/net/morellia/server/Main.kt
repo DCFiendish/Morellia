@@ -1,13 +1,17 @@
 package net.morellia.server
 
+import me.lucko.spark.minestom.SparkMinestom
 import net.aechronis.nodes.Nodes
 import net.aechronis.nodes.NodesConfig
 import net.aechronis.utils.createTestServer
+import net.aechronis.utils.hasPermission
 import net.aechronis.vanilla.Vanilla
 import net.aechronis.vanilla.VanillaConfig
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
+import net.minestom.server.command.ConsoleSender
 import net.minestom.server.coordinate.Pos
+import net.minestom.server.entity.Player
 import net.minestom.server.instance.anvil.AnvilLoader
 import net.morellia.combat.Combat
 import java.nio.file.Path
@@ -48,6 +52,14 @@ fun main() {
     TickMonitor.init()
     LoadTestBots.init()
     PvpKit.init()
+    // Perf profiler -- /spark ..., self-registers its own commands (`.commands(true)`). Same
+    // morellia.<node> permission convention as every other admin command here (see TestGunGive's
+    // "morellia.testgun", backed by the same net.aechronis.utils.hasPermission); console is always
+    // allowed, matching every other CommandSender that isn't a Player.
+    SparkMinestom.builder(Path.of("morellia-data/spark"))
+        .commands(true)
+        .permissionHandler { sender, permission -> sender is ConsoleSender || (sender is Player && sender.hasPermission(permission)) }
+        .enable()
     MinecraftServer.getCommandManager().register(TestGunGive())
     MinecraftServer.getCommandManager().register(SourceCommand())
     MinecraftServer.getCommandManager().register(KitCommand())

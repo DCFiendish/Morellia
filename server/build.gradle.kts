@@ -20,6 +20,9 @@ dependencies {
     implementation(project(":modules:nodes"))
     implementation(project(":modules:combat"))
     implementation("org.slf4j:slf4j-simple:2.0.18")
+    // Perf profiler -- github.com/LooFifteen/spark's Minestom port of lucko/spark, see Main.kt's
+    // SparkMinestom.builder() call. Only version currently published to repo.hypera.dev.
+    implementation("dev.lu15:spark-minestom:1.10-SNAPSHOT")
     // Not running LuckPerms at all — this is here purely so utils' Permissions.kt can resolve
     // LuckPermsProvider at runtime (NoClassDefFoundError otherwise) and fall through to its
     // intended graceful-denial path instead of crashing every permission-gated command.
