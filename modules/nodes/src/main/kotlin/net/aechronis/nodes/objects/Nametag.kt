@@ -5,6 +5,7 @@
 package net.aechronis.nodes.objects
 import net.aechronis.nodes.Nodes
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.color.TeamColor
 import net.minestom.server.entity.Player
@@ -95,7 +96,10 @@ object Nametag {
             val createAction = TeamsPacket.CreateTeamAction(
                 TeamsPacket.Settings(
                     Component.text(teamName), // displayName
-                    Component.text(prefix), // displayName
+                    // prefix is a legacy "§a[Town]"-style string (see ChatColor) -- Component.text()
+                    // treats that literally instead of parsing it, so every nametag rendered the raw
+                    // "§a" as unprintable boxes in front of the actual name.
+                    LegacyComponentSerializer.legacySection().deserialize(prefix), // displayName
                     Component.empty(), // teamSuffix
                     TeamsPacket.NameTagVisibility.ALWAYS, // nameTagVisibility
                     TeamsPacket.CollisionRule.ALWAYS, // collisionRule

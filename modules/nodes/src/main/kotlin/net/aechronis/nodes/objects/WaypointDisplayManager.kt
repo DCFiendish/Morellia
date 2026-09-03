@@ -188,8 +188,10 @@ internal class WaypointDisplayManager(
 }
 
 internal fun waypointDisplayLabel(waypoint: Waypoint, isDeath: Boolean, distance: Double): Component {
+    // "☠" isn't in Minecraft's default font -- it rendered as an unprintable box (with the rest of
+    // the label silently blanked alongside it) instead of a skull, right above the death spot.
     val title = Component.text(
-        if (isDeath) "☠ Latest Death" else waypoint.name,
+        if (isDeath) "Latest Death" else waypoint.name,
         waypointDisplayColor(waypoint, isDeath),
     )
     return title

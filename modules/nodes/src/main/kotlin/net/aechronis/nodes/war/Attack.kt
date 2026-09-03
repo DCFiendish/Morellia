@@ -13,6 +13,7 @@ import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.objects.townNametagViewedByPlayer
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.BlockVec
 import net.minestom.server.coordinate.Pos
@@ -236,6 +237,9 @@ private fun createTextDisplay(
 private fun setTextDisplayText(entity: Entity, text: String) {
     val meta = entity.entityMeta
     if (meta is TextDisplayMeta) {
-        meta.text = Component.text(text)
+        // text embeds a legacy "§a[Town]"-style prefix (see townNametagViewedByPlayer) --
+        // Component.text() would render that "§a" literally instead of as color (same bug as
+        // Nametag.kt's team prefix).
+        meta.text = LegacyComponentSerializer.legacySection().deserialize(text)
     }
 }

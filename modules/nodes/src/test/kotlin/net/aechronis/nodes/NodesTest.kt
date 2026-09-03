@@ -544,6 +544,17 @@ class NodesTest {
         }
     }
 
+    @Test
+    fun `legacy nametag color codes don't survive as literal text`() {
+        // townNametagViewedByPlayer() (see Nametag.kt) returns raw "§a[Town]"-style legacy strings --
+        // wrapping one straight in Component.text() (the bug this guards) renders the "§" and color
+        // letter as literal unprintable glyphs above the player's head instead of applying the color.
+        val legacy = "${net.aechronis.nodes.utils.ChatColor.GREEN}[Testville]"
+        val component = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection().deserialize(legacy)
+        val plainText = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(component)
+        assertEquals("[Testville]", plainText)
+    }
+
     @AfterAll
     fun tearDown() {
         // if -DkeepRunning=true is set keep server running for manual testing

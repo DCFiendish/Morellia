@@ -7,6 +7,7 @@ import net.aechronis.vanilla.objects.StonecutterConversionRecipe
 import net.kyori.adventure.text.Component
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Player
+import net.minestom.server.instance.block.Block
 import net.minestom.server.inventory.Inventory
 import net.minestom.server.inventory.InventoryType
 import net.minestom.server.item.Material
@@ -61,10 +62,18 @@ object Blocks {
             }
         }
 
+        registerLadderPlacementRule()
         BlocksListener.init()
 
         val timeEnd = System.currentTimeMillis()
         val timeLoad = timeEnd - timeStart
         println("├─ Blocks enabled in ${timeLoad}ms")
+    }
+
+    private fun registerLadderPlacementRule() {
+        val blockManager = MinecraftServer.getBlockManager()
+        val existing = blockManager.getBlockPlacementRule(Block.LADDER)
+        if (existing is LadderPlacementRule) return
+        blockManager.registerBlockPlacementRule(LadderPlacementRule(Block.LADDER, existing))
     }
 }

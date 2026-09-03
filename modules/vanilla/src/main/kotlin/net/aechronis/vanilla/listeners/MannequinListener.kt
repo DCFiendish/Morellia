@@ -14,6 +14,7 @@ import net.minestom.server.event.inventory.InventoryItemChangeEvent
 import net.minestom.server.event.player.PlayerDeathEvent
 import net.minestom.server.event.player.PlayerEntityInteractEvent
 import net.minestom.server.inventory.Inventory
+import net.minestom.server.network.player.GameProfile
 import net.minestom.server.network.player.ResolvableProfile
 import net.minestom.server.timer.TaskSchedule
 
@@ -47,7 +48,12 @@ object MannequinListener {
             // client) -- ResolvableProfile(PlayerSkin) unconditionally calls skin.textures()
             // and NPEs on that, so this fell through the whole onDeath body (never registering
             // the corpse, never clearing the inventory) every time such a player died.
-            meta.profile = player.skin?.let { ResolvableProfile(it) } ?: ResolvableProfile.EMPTY
+            // ResolvableProfile.EMPTY has no name/uuid, so the client renders the mannequin's
+            // native nameplate as placeholder tofu boxes instead of blank -- fall back to a
+            // GameProfile carrying the real identity (skinless, but a valid name) instead.
+            meta.profile =
+                player.skin?.let { ResolvableProfile(it) }
+                    ?: ResolvableProfile(GameProfile(player.uuid, player.username))
         }
 
         val loot = Mannequin.newLootInventory(player.username)
