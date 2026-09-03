@@ -7,9 +7,12 @@ import net.aechronis.utils.createTestServer
 import net.aechronis.utils.hasPermission
 import net.aechronis.vanilla.Vanilla
 import net.aechronis.vanilla.VanillaConfig
+import net.aechronis.vanilla.config.PvpPrepConfig
+import net.aechronis.vanilla.objects.PrepZoneConfig
 import net.minestom.server.Auth
 import net.minestom.server.MinecraftServer
 import net.minestom.server.command.ConsoleSender
+import net.minestom.server.coordinate.BlockVec
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.Player
 import net.minestom.server.instance.anvil.AnvilLoader
@@ -37,10 +40,24 @@ fun main() {
     // back to StoneFlatTerrain.generator for every chunk.
     instance.setChunkLoader(AnvilLoader(Path.of("morellia-data/nodisium-playtest-map/dimensions/minecraft/overworld")))
     instance.setChunkSupplier(::FullbrightChunk)
-    // TODO(pvp playtest): warpsConfig.warps and pvpPrepConfig.zones are empty by default (same as
-    // kothsConfig above them) -- add real WarpPoint/PrepZoneConfig entries here, each referencing
-    // `instance`, once the warp landing spots and their no-damage/no-break box corners are picked.
-    Vanilla.init(VanillaConfig(path = "morellia-data/vanilla"))
+    // warpsConfig.warps stays empty here -- the 4 koth warps were set live via /setwarp and are
+    // already persisted in morellia-data/vanilla/warps.json (Warp.loadPersisted reads them back
+    // on boot, see Warp.kt kdoc). pvpPrepConfig.zones has no in-game equivalent of /setwarp, so
+    // each landing spot's no-damage/no-break box is defined here from exact WorldEdit corners
+    // picked in-game at each warp's landing platform.
+    fun prepZone(name: String, cornerOne: BlockVec, cornerTwo: BlockVec) = PrepZoneConfig(
+        name = name,
+        instance = instance,
+        cornerOne = cornerOne,
+        cornerTwo = cornerTwo,
+    )
+    val prepZones = listOf(
+        prepZone("koth1", BlockVec(193, -25, 251), BlockVec(199, -22, 254)),
+        prepZone("koth2", BlockVec(292, -24, 72), BlockVec(295, -21, 66)),
+        prepZone("koth3", BlockVec(126, -25, 5), BlockVec(130, -22, 2)),
+        prepZone("koth4", BlockVec(9, -23, 207), BlockVec(6, -20, 213)),
+    )
+    Vanilla.init(VanillaConfig(path = "morellia-data/vanilla", pvpPrepConfig = PvpPrepConfig(zones = prepZones)))
     // Testing-only: cut capture time way down so siege tests don't take forever. Both test
     // territories are wilderness-bordering AND each town's home, so wasteland (2x) and home (2x)
     // multipliers stack: actual capture time = chunkAttackTime(ms) * 0.004. 7500ms -> 30s actual.
