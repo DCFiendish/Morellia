@@ -40,6 +40,9 @@ fun main() {
     // back to StoneFlatTerrain.generator for every chunk.
     instance.setChunkLoader(AnvilLoader(Path.of("morellia-data/nodisium-playtest-map/dimensions/minecraft/overworld")))
     instance.setChunkSupplier(::FullbrightChunk)
+    // Real permission gating -- see Permissions.kt kdoc. Enabled before any command registers so
+    // every hasPermission check from here on resolves against real group data, not a missing provider.
+    Permissions.init()
     // warpsConfig.warps stays empty here -- the 4 koth warps were set live via /setwarp and are
     // already persisted in morellia-data/vanilla/warps.json (Warp.loadPersisted reads them back
     // on boot, see Warp.kt kdoc). pvpPrepConfig.zones has no in-game equivalent of /setwarp, so

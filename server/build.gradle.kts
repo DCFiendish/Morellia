@@ -24,10 +24,12 @@ dependencies {
     // Perf profiler -- github.com/LooFifteen/spark's Minestom port of lucko/spark, see Main.kt's
     // SparkMinestom.builder() call. Only version currently published to repo.hypera.dev.
     implementation("dev.lu15:spark-minestom:1.10-SNAPSHOT")
-    // Not running LuckPerms at all — this is here purely so utils' Permissions.kt can resolve
-    // LuckPermsProvider at runtime (NoClassDefFoundError otherwise) and fall through to its
-    // intended graceful-denial path instead of crashing every permission-gated command.
+    // Real permission gating — ConceptMC's Minestom port of LuckPerms, same lib+wiring as
+    // Aechronis/aechronis's own Server.kt. See net.morellia.server.Permissions. H2 is its default
+    // storage backend (file-based, morellia-data/luckperms/) — no external DB needed for this.
     implementation("com.conceptmc:luckperms-minestom:5.5-SNAPSHOT")
+    implementation("com.h2database:h2:2.4.240")
+    implementation("com.zaxxer:HikariCP:7.1.0")
 }
 
 application {
