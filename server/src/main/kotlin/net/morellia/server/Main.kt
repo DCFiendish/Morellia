@@ -59,6 +59,7 @@ fun main() {
         prepZone("koth2", BlockVec(292, -24, 72), BlockVec(295, -21, 66)),
         prepZone("koth3", BlockVec(126, -25, 5), BlockVec(130, -22, 2)),
         prepZone("koth4", BlockVec(9, -23, 207), BlockVec(6, -20, 213)),
+        prepZone("spawn", BlockVec(159, 107, 144), BlockVec(144, 104, 159)),
     )
     Vanilla.init(VanillaConfig(path = "morellia-data/vanilla", pvpPrepConfig = PvpPrepConfig(zones = prepZones)))
     // Testing-only: cut capture time way down so siege tests don't take forever. Both test
