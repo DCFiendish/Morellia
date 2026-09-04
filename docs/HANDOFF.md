@@ -169,7 +169,7 @@ asset pipeline) are not started.** None of this is committed to git yet — it's
 working tree (`modules/combat/`, plus edits to `FlagWar.kt`, `TestWeapons.kt`, `Main.kt`,
 `ResourcePack.kt`, and new `DevLoadout.kt`/`TestMeleeTarget.kt` in `server/`).
 
-- **`modules/combat` is a from-scratch module**, package `net.morellia.combat` (own namespace, not
+- **`modules/combat` is a from-scratch module**, package `net.nodisium.combat` (own namespace, not
   AGPL-bound the way the forked `nodes`/`vanilla`/`utils` are) — `net.aechronis:combat` is now fully
   dropped, including its GitHub Packages repo block in the root `build.gradle.kts`.
 - **Every named CRITICAL/HIGH bug from `COMBAT_DEEP_DIVE.md` that's in scope so far was designed out
@@ -348,10 +348,10 @@ mesh-dedup-by-geometry theory was wrong — root cause and fix:
   online player — not once on a state-transition edge the way Nodisium's `AimingListener` did. A
   one-shot set on the aim-press edge was getting silently lost/stale client-side; continuous
   resend is what makes it actually stick.
-- **Fix**: [Gun.kt](../modules/combat/src/main/kotlin/net/morellia/combat/objects/Gun.kt)'s
+- **Fix**: [Gun.kt](../modules/combat/src/main/kotlin/net/nodisium/combat/objects/Gun.kt)'s
   `refreshModel` now writes the model component unconditionally (dropped the "only if changed"
   guard and the temp debug println from the entry above). New
-  [ModelRefreshTask.kt](../modules/combat/src/main/kotlin/net/morellia/combat/tasks/ModelRefreshTask.kt)
+  [ModelRefreshTask.kt](../modules/combat/src/main/kotlin/net/nodisium/combat/tasks/ModelRefreshTask.kt)
   is a 1-tick repeating task (mirrors the existing `ActionBarManager` pattern) that calls
   `refreshModel` for every online player holding a `Gun`, wired into `Combat.initialize()`. This
   is gun-agnostic — it fixes ADS rendering for every current and future `Gun`, not just the musket.
@@ -919,7 +919,7 @@ check) before moving to the next.
   direction**: falloff removed entirely — flat `maxDamage == minDamage == 12.7f` from 0 out to
   `maxRange = 512.0` (the render-distance ceiling this project might push to), by collapsing
   `DamageFalloff`'s start/end range to a single point rather than adding a separate flat-damage
-  type. See [`TestWeapons.kt`](../server/src/main/kotlin/net/morellia/server/TestWeapons.kt)'s
+  type. See [`TestWeapons.kt`](../server/src/main/kotlin/net/nodisium/server/TestWeapons.kt)'s
   `kar98k` definition for the current numbers.
 - **A `/code-review`-style pass over all of `modules/combat`** (not diff-scoped — the whole module,
   requested directly, effort auto-escalated to "high" by the loaded skill instructions) surfaced 4
@@ -1219,7 +1219,7 @@ needed for the era fit.
 The server no longer runs on a flat stone test world. A real Minecraft Anvil world (sourced from a
 "Rise of Rome" terrain download covering Europe, trimmed to a box spanning Britain through Morocco
 — roughly `x: -8192..2559, z: -5632..3071` in block coordinates) is loaded via `AnvilLoader` in
-[server/src/main/kotlin/net/morellia/server/AgadirWorld.kt](server/src/main/kotlin/net/morellia/server/AgadirWorld.kt),
+[server/src/main/kotlin/net/nodisium/server/AgadirWorld.kt](server/src/main/kotlin/net/nodisium/server/AgadirWorld.kt),
 wired into `Main.kt`. Anything outside the trimmed box falls through to `StoneFlatTerrain`'s
 generator (flat stone), so the world never has unrendered holes.
 

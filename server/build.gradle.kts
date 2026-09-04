@@ -30,7 +30,7 @@ dependencies {
     // SparkMinestom.builder() call. Only version currently published to repo.hypera.dev.
     implementation("dev.lu15:spark-minestom:1.10-SNAPSHOT")
     // Real permission gating — ConceptMC's Minestom port of LuckPerms, same lib+wiring as
-    // Aechronis/aechronis's own Server.kt. See net.morellia.server.Permissions. H2 is its default
+    // Aechronis/aechronis's own Server.kt. See net.nodisium.server.Permissions. H2 is its default
     // storage backend (file-based, morellia-data/luckperms/) — no external DB needed for this.
     implementation("com.conceptmc:luckperms-minestom:5.5-SNAPSHOT")
     implementation("com.h2database:h2:2.4.240")
@@ -38,7 +38,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("net.morellia.server.MainKt")
+    mainClass.set("net.nodisium.server.MainKt")
 }
 
 tasks.shadowJar {

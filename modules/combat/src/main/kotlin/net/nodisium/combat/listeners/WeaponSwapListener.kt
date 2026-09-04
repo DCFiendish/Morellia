@@ -1,0 +1,28 @@
+package net.nodisium.combat.listeners
+
+import net.minestom.server.event.player.PlayerSwapItemEvent
+import net.nodisium.combat.Combat
+import net.nodisium.combat.objects.Gun
+import net.nodisium.combat.objects.Item
+
+/**
+ * H5 fix (docs/COMBAT_DEEP_DIVE.md): the prior-art library this replaces only reset attack
+ * cooldown on hotbar-slot changes, never on the F-key main/off-hand swap -- a maxed-out cooldown
+ * on an idle item could be F-swapped in for an instant full-power first hit. Cancelling the swap
+ * outright while holding any combat item closes the vector entirely: there's no swap to exploit if
+ * it never happens.
+ *
+ * The offhand-swap key doubles as a manual reload trigger for guns: [ReloadListener.tryStartReload]
+ * already no-ops on a full magazine or an in-progress reload, so this is safe to call unconditionally.
+ */
+object WeaponSwapListener {
+    private fun onSwap(event: PlayerSwapItemEvent) {
+        val item = Item.getFromItemStack(event.player.itemInMainHand) ?: return
+        event.isCancelled = true
+        if (item is Gun) ReloadListener.tryStartReload(event.player, item)
+    }
+
+    fun init() {
+        Combat.eventNode.addListener(PlayerSwapItemEvent::class.java, ::onSwap)
+    }
+}

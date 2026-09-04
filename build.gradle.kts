@@ -4,7 +4,7 @@ plugins {
 }
 
 allprojects {
-    group = "net.morellia"
+    group = "net.nodisium"
     version = "local"
 
     repositories {

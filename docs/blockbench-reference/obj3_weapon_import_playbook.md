@@ -263,7 +263,7 @@ hip-fire pose and only needs doing once the hip-fire pose is already confirmed g
 **No swing-cancellation math needed here** — unlike section 5, the aiming pose reuses the *same*
 rotation as hip-fire (no new rotation means no new anchor-swing to cancel), and just adds a
 translation delta on top of the already-correct hip-fire translation. This is a plain
-[`Gun.customModelDataAiming`](../../modules/combat/src/main/kotlin/net/morellia/combat/objects/Gun.kt)
+[`Gun.customModelDataAiming`](../../modules/combat/src/main/kotlin/net/nodisium/combat/objects/Gun.kt)
 swap in `CUSTOM_MODEL_DATA` — same mechanism `Gun.itemModelAiming` already used for the older
 item_model-pipeline guns (musket/springfield/karabiner), extended to also cover this obj³
 `custom_model_data`-selected pipeline (see `Gun.refreshModel`).
