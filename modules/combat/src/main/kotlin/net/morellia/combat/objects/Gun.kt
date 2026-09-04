@@ -82,6 +82,9 @@ class Gun(
      */
     val usableZones: List<(Instance, Pos) -> Boolean> = emptyList(),
 ) : Item(name, itemName, itemLore, itemModel, material, customModelData) {
+    /** Stamps a fresh [Tags.INSTANCE_ID] on top of the base stack -- see ReloadListener's kdoc. */
+    override fun toItemStack(): ItemStack = super.toItemStack().withTag(Tags.INSTANCE_ID, java.util.UUID.randomUUID())
+
     init {
         require(magazineSize > 0) { "magazineSize must be > 0" }
         require(maxRange.isFinite() && maxRange > 0.0) { "maxRange must be a positive finite number" }

@@ -24,14 +24,18 @@ open class Item(
      */
     val customModelData: String? = null,
 ) {
-    /** Builds a fresh physical stack. Every call stamps a new [Tags.INSTANCE_ID] -- see its kdoc. */
+    /**
+     * Builds a fresh physical stack. Does *not* stamp [Tags.INSTANCE_ID] -- only [Gun] needs that
+     * (see ReloadListener), and every other item here is fungible and must stay vanilla-stackable:
+     * a per-call random tag would make every stack's data components unique, so the client could
+     * never merge two of them past count 1 (e.g. Ammo, which players expect to stack to 64).
+     */
     open fun toItemStack(): ItemStack {
         var stack =
             ItemStack.of(material)
                 .with(DataComponents.ITEM_NAME, itemName)
                 .with(DataComponents.LORE, itemLore)
                 .withTag(Tags.NAME, name)
-                .withTag(Tags.INSTANCE_ID, UUID.randomUUID())
         if (itemModel != null) stack = stack.with(DataComponents.ITEM_MODEL, itemModel)
         if (customModelData != null) {
             stack = stack.with(DataComponents.CUSTOM_MODEL_DATA, CustomModelData(listOf(), listOf(), listOf(customModelData), listOf()))
