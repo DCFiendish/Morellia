@@ -5,9 +5,9 @@ import me.lucko.luckperms.minestom.LuckPermsMinestom
 import net.luckperms.api.LuckPermsProvider
 import net.luckperms.api.node.Node
 import net.luckperms.api.node.types.InheritanceNode
-import java.nio.charset.StandardCharsets
+import net.minestom.server.MinecraftServer
+import net.minestom.server.event.player.PlayerSpawnEvent
 import java.nio.file.Path
-import java.util.UUID
 
 /**
  * Real LuckPerms (ConceptMC's Minestom port, same lib+convention as Aechronis/aechronis's own
@@ -21,9 +21,17 @@ import java.util.UUID
  * `/lp` in-game afterward sticks across restarts): `default` (base gameplay -- every player lands
  * here automatically, LuckPerms' own reserved name), `mod` (inherits default, adds moderation
  * tools), `staff` (inherits mod, gets `*` -- everything, including nodes.admin/worldedit/spark).
- * DCFiendish is seeded into `staff` directly so admin access isn't lost the moment this goes live.
+ *
+ * [ownerUsernames] get `staff` assigned live on their own join instead of at a UUID guessed here
+ * at boot -- offline-mode UUIDs come from whatever the connecting client sends in its login packet
+ * (confirmed via decompiling Minestom's LoginListener: it trusts ClientLoginStartPacket.profileId()
+ * as-is, no server-side "OfflinePlayer:<name>" hashing), so a client-specific UUID scheme (e.g. the
+ * morellia-testclient dev client) won't match that guess. Using `player.uuid` at actual spawn time
+ * is the real key LuckPerms checks permissions against, whatever it turns out to be.
  */
 object Permissions {
+    private val ownerUsernames = setOf("DCFiendish")
+
     private val defaultNodes = setOf(
         "vanilla.warp", "vanilla.ec", "vanilla.craft", "vanilla.koth", "vanilla.kit",
         "vanilla.list", "vanilla.ignore", "vanilla.music", "vanilla.back",
@@ -42,27 +50,29 @@ object Permissions {
 
         val luckPerms = LuckPermsProvider.get()
         val groupManager = luckPerms.groupManager
-        if (groupManager.getGroup("staff") != null) return
+        if (groupManager.getGroup("staff") == null) {
+            val default = groupManager.createAndLoadGroup("default").join()
+            val mod = groupManager.createAndLoadGroup("mod").join()
+            val staff = groupManager.createAndLoadGroup("staff").join()
 
-        val default = groupManager.createAndLoadGroup("default").join()
-        val mod = groupManager.createAndLoadGroup("mod").join()
-        val staff = groupManager.createAndLoadGroup("staff").join()
+            defaultNodes.forEach { default.data().add(Node.builder(it).build()) }
+            mod.data().add(InheritanceNode.builder("default").build())
+            modNodes.forEach { mod.data().add(Node.builder(it).build()) }
+            staff.data().add(InheritanceNode.builder("mod").build())
+            staff.data().add(Node.builder("*").build())
 
-        defaultNodes.forEach { default.data().add(Node.builder(it).build()) }
-        mod.data().add(InheritanceNode.builder("default").build())
-        modNodes.forEach { mod.data().add(Node.builder(it).build()) }
-        staff.data().add(InheritanceNode.builder("mod").build())
-        staff.data().add(Node.builder("*").build())
+            groupManager.saveGroup(default).join()
+            groupManager.saveGroup(mod).join()
+            groupManager.saveGroup(staff).join()
+        }
 
-        groupManager.saveGroup(default).join()
-        groupManager.saveGroup(mod).join()
-        groupManager.saveGroup(staff).join()
-
-        // Same offline-UUID derivation as Auth.Offline() (Main.kt) uses for real player UUIDs --
-        // without this, DCFiendish would be locked out of every admin command by their own group.
-        val dcUuid = UUID.nameUUIDFromBytes("OfflinePlayer:DCFiendish".toByteArray(StandardCharsets.UTF_8))
-        val dcUser = luckPerms.userManager.loadUser(dcUuid, "DCFiendish").join()
-        dcUser.data().add(InheritanceNode.builder("staff").build())
-        luckPerms.userManager.saveUser(dcUser).join()
+        MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) { event ->
+            if (!event.isFirstSpawn || event.player.username !in ownerUsernames) return@addListener
+            // Node.add is idempotent (returns DataMutateResult.ALREADY_HAS, no duplicate) -- no
+            // membership check needed before adding on every join.
+            val user = luckPerms.userManager.loadUser(event.player.uuid, event.player.username).join()
+            user.data().add(InheritanceNode.builder("staff").build())
+            luckPerms.userManager.saveUser(user).join()
+        }
     }
 }
