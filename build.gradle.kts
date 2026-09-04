@@ -14,6 +14,8 @@ allprojects {
         maven("https://oss.sonatype.org/content/repositories/snapshots/") // spark-common's own transitive deps
         maven("https://maven.conceptmc.com/releases") // com.conceptmc:luckperms-minestom — unaudited SNAPSHOT, server-only test dep
         maven("https://maven.enginehub.org/repo/") // com.sk89q.worldedit:worldedit-core (modules/worldedit)
+        maven("https://mvn.everbuild.org/public") // org.everbuild.blocksandstuff:* (modules/vanilla signs/shelves/item-frames)
+        maven("https://jitpack.io") // com.modernmt.text:profanity-filter (modules/vanilla chat filter)
 
         // One block per Aechronis library actually depended on — each library publishes to its
         // own GitHub Packages path (Aechronis/<repo>), not a shared "Aechronis/aechronis" package.

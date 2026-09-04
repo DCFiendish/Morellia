@@ -6,6 +6,7 @@ import net.aechronis.vanilla.objects.KothConfig
 import net.aechronis.vanilla.objects.KothZone
 import net.minestom.server.coordinate.BlockVec
 import net.minestom.server.coordinate.Pos
+import java.time.LocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,6 +14,20 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class KothTest : ManagerTest() {
+    @Test
+    fun `cron schedules match values ranges lists and steps`() {
+        val mondayAtEighteen = LocalDateTime.of(2026, 8, 3, 18, 0)
+
+        assertTrue(Koth.matchesSchedule("* * * * *", mondayAtEighteen))
+        assertTrue(Koth.matchesSchedule("0 18 * * *", mondayAtEighteen))
+        assertTrue(Koth.matchesSchedule("0 18 * * 1-5", mondayAtEighteen))
+        assertTrue(Koth.matchesSchedule("0 18 * * 0,1", mondayAtEighteen))
+        assertTrue(Koth.matchesSchedule("*/15 * * * *", mondayAtEighteen))
+        assertFalse(Koth.matchesSchedule("1 18 * * *", mondayAtEighteen))
+        assertFalse(Koth.matchesSchedule("0 18 * * 0", mondayAtEighteen))
+        assertFalse(Koth.matchesSchedule("not a cron expression", mondayAtEighteen))
+    }
+
     @Test
     fun `zone normalizes both corners and includes all configured blocks`() {
         val zone = KothZone(BlockVec(10, 20, 30), BlockVec(8, 18, 28))

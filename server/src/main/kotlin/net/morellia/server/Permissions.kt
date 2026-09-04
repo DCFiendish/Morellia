@@ -39,6 +39,7 @@ object Permissions {
     private val modNodes = setOf(
         "vanilla.invsee", "vanilla.kill", "vanilla.teleport", "vanilla.gamemode",
         "vanilla.clear", "vanilla.fly", "vanilla.broadcast", "vanilla.whitelist", "vanilla.give",
+        "vanilla.vanish.1",
     )
 
     fun init() {

@@ -20,6 +20,8 @@ import net.aechronis.vanilla.commands.Music
 import net.aechronis.vanilla.commands.Reply
 import net.aechronis.vanilla.commands.SetWarpCommand
 import net.aechronis.vanilla.commands.Teleport
+import net.aechronis.vanilla.commands.Vanish
+import net.aechronis.vanilla.commands.Vote
 import net.aechronis.vanilla.commands.WarpCommand
 import net.aechronis.vanilla.commands.Whitelist
 import net.aechronis.vanilla.listeners.BlockPlacementCooldownListener
@@ -35,7 +37,9 @@ import net.aechronis.vanilla.managers.Combat
 import net.aechronis.vanilla.managers.Crops
 import net.aechronis.vanilla.managers.Elevator
 import net.aechronis.vanilla.managers.EnvironmentalDamage
+import net.aechronis.vanilla.managers.Filter
 import net.aechronis.vanilla.managers.Food
+import net.aechronis.vanilla.managers.ItemFrames
 import net.aechronis.vanilla.managers.Items
 import net.aechronis.vanilla.managers.Koth
 import net.aechronis.vanilla.managers.Mannequin
@@ -43,13 +47,17 @@ import net.aechronis.vanilla.managers.PlayerData
 import net.aechronis.vanilla.managers.PvpPrep
 import net.aechronis.vanilla.managers.Recipes
 import net.aechronis.vanilla.managers.Saplings
+import net.aechronis.vanilla.managers.Shelves
+import net.aechronis.vanilla.managers.Signs
 import net.aechronis.vanilla.managers.Storage
 import net.aechronis.vanilla.managers.TreeFeller
+import net.aechronis.vanilla.managers.VoteLinks
 import net.aechronis.vanilla.managers.Warp
 import net.minestom.server.MinecraftServer
 import net.minestom.server.event.EventNode
 import java.nio.file.Path
 import net.aechronis.vanilla.managers.Music as MusicManager
+import net.aechronis.vanilla.managers.Vanish as VanishManager
 import net.aechronis.vanilla.managers.Whitelist as WhitelistManager
 
 object Vanilla {
@@ -89,11 +97,17 @@ object Vanilla {
             if (config.whitelistEnabled) commands += Whitelist()
             if (config.kothEnabled) commands += KothCommand()
             if (config.warpEnabled) commands += listOf(WarpCommand(), SetWarpCommand())
+            if (config.vanishEnabled) commands += Vanish()
+            if (config.voteEnabled) commands += Vote()
             MinecraftServer.getCommandManager().register(*commands.toTypedArray())
         }
         println("Loading Vanilla")
+        if (config.filterEnabled) Filter.init()
         if (config.playerDataEnabled) PlayerData.init(Path.of(config.path, config.playerDataPath))
         if (config.storageEnabled) Storage.init(Path.of(config.path, config.storagePath))
+        if (config.signsEnabled) Signs.init()
+        if (config.shelvesEnabled) Shelves.init()
+        if (config.itemFramesEnabled) ItemFrames.init()
         if (config.whitelistEnabled) WhitelistManager.init(Path.of(config.path, config.whitelistPath))
         if (config.recipesEnabled) Recipes.init()
         if (config.cropsEnabled) Crops.init()
@@ -120,6 +134,8 @@ object Vanilla {
         if (config.kothEnabled) Koth.init()
         if (config.warpEnabled) Warp.init(Path.of(config.path, config.warpsPath))
         if (config.pvpPrepEnabled) PvpPrep.init()
+        if (config.vanishEnabled) VanishManager.init()
+        if (config.voteEnabled) VoteLinks.init(Path.of(config.path, config.votePath))
 
         Runtime.getRuntime().addShutdownHook(
             Thread({

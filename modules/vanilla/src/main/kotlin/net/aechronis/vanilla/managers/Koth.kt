@@ -1,5 +1,9 @@
 package net.aechronis.vanilla.managers
 
+import com.cronutils.model.CronType
+import com.cronutils.model.definition.CronDefinitionBuilder
+import com.cronutils.model.time.ExecutionTime
+import com.cronutils.parser.CronParser
 import net.aechronis.vanilla.Vanilla
 import net.aechronis.vanilla.listeners.KothListener
 import net.aechronis.vanilla.objects.KothConfig
@@ -13,7 +17,6 @@ import net.minestom.server.entity.GameMode
 import net.minestom.server.entity.Player
 import net.minestom.server.timer.TaskSchedule
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.UUID
@@ -24,6 +27,7 @@ object Koth {
         val config: KothConfig,
         val startedAt: Long,
         val endsAt: Long,
+        var nextAnnouncementAt: Long = startedAt + ANNOUNCEMENT_INTERVAL_MS,
         var capturer: UUID? = null,
         var captureStartedAt: Long? = null,
         val bossBars: MutableMap<UUID, BossBar> = ConcurrentHashMap(),
@@ -37,10 +41,13 @@ object Koth {
     // is written by KothListener's death/respawn/quit handlers (each player's own thread) while
     // read from isInside() during another player's zone check.
     private val definitions = linkedMapOf<String, KothConfig>()
-    private val schedules = linkedMapOf<String, List<LocalTime>>()
+    private val schedules = linkedMapOf<String, List<String>>()
     private val scheduledRuns = mutableMapOf<String, LocalDateTime>()
     internal val active = ConcurrentHashMap<String, ActiveKoth>()
     internal val deadPlayers: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+    private val cronParser = CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX))
+
+    private const val ANNOUNCEMENT_INTERVAL_MS = 10 * 60 * 1000L
 
     fun init() {
         val timeStart = System.currentTimeMillis()
@@ -104,6 +111,8 @@ object Koth {
                 continue
             }
 
+            announceIfDue(state, now)
+
             if (state.capturer == null) {
                 val player =
                     MinecraftServer
@@ -152,23 +161,45 @@ object Koth {
         definitions.clear()
         definitions.putAll(config.kothsConfig.koths.associateBy { it.name })
         require(
-            config.kothsConfig.kothTimes.keys
+            config.kothsConfig.kothSchedules.keys
                 .all { it in definitions },
         ) { "KOTH schedules contain an unknown KOTH" }
+        require(
+            config.kothsConfig.kothSchedules.values
+                .flatten()
+                .all { runCatching { cronParser.parse(it).validate() }.isSuccess },
+        ) { "KOTH schedules must be valid five-field Unix cron expressions" }
         schedules.clear()
-        schedules.putAll(config.kothsConfig.kothTimes)
+        schedules.putAll(config.kothsConfig.kothSchedules)
     }
 
     private fun startScheduled(dateTime: LocalDateTime) {
-        for ((name, times) in schedules) {
-            for (time in times) {
-                val scheduledAt = LocalDateTime.of(dateTime.toLocalDate(), time.withNano(0))
-                if (dateTime != scheduledAt || scheduledRuns[name] == scheduledAt) continue
-                scheduledRuns[name] = scheduledAt
-                start(name)
-            }
+        val minute = dateTime.withSecond(0).withNano(0)
+        for ((name, expressions) in schedules) {
+            if (scheduledRuns[name] == minute || expressions.none { matchesSchedule(it, minute) }) continue
+            scheduledRuns[name] = minute
+            start(name)
         }
     }
+
+    private fun announceIfDue(
+        state: ActiveKoth,
+        now: Long,
+    ) {
+        if (now < state.nextAnnouncementAt) return
+        state.nextAnnouncementAt = now + ANNOUNCEMENT_INTERVAL_MS
+        val remaining = formatTime((state.endsAt - now).coerceAtLeast(0))
+        broadcast(Component.text("KOTH ${state.config.name} is still active! $remaining remaining.", NamedTextColor.GOLD))
+    }
+
+    internal fun matchesSchedule(
+        expression: String,
+        minute: LocalDateTime,
+    ): Boolean =
+        runCatching {
+            val cron = cronParser.parse(expression).also { it.validate() }
+            ExecutionTime.forCron(cron).isMatch(minute.atZone(ZoneId.systemDefault()))
+        }.getOrDefault(false)
 
     internal fun beginCapture(
         state: ActiveKoth,

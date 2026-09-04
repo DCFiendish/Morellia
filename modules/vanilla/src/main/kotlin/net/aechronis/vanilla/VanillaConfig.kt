@@ -37,6 +37,12 @@ data class VanillaConfig(
     val pvpPrepEnabled: Boolean = true,
     val movementAntiCheatEnabled: Boolean = true,
     val blockPlacementCooldownEnabled: Boolean = true,
+    val filterEnabled: Boolean = true,
+    val signsEnabled: Boolean = true,
+    val shelvesEnabled: Boolean = true,
+    val itemFramesEnabled: Boolean = true,
+    val vanishEnabled: Boolean = true,
+    val voteEnabled: Boolean = true,
     // Paths
     val path: String = "vanilla",
     val playerDataPath: String = "playerdata",
@@ -44,6 +50,7 @@ data class VanillaConfig(
     val whitelistPath: String = "whitelist.json",
     val spawnPath: String = "spawn",
     val warpsPath: String = "warps.json",
+    val votePath: String = "vote.txt",
     // Blocks
     val blocksConfig: BlocksConfig = BlocksConfig(),
     // Food
