@@ -16,6 +16,11 @@ dependencies {
     implementation("net.minestom:minestom:2026.07.12-26.2")
     implementation("com.google.code.gson:gson:2.14.0")
     implementation("net.aechronis:utils:86a747b")
+    // modules/vanilla only declares these compileOnly (matching its net.aechronis:utils pattern),
+    // so the real runtime jars have to be pulled in here or Signs.kt's DroppedItemFactory use
+    // throws NoClassDefFoundError the first time a sign is broken.
+    implementation("org.everbuild.blocksandstuff:blocksandstuff-blocks:1.10.2-SNAPSHOT")
+    implementation("org.everbuild.blocksandstuff:blocksandstuff-common:1.10.2-SNAPSHOT")
     implementation(project(":modules:vanilla"))
     implementation(project(":modules:nodes"))
     implementation(project(":modules:combat"))
