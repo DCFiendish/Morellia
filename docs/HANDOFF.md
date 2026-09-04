@@ -1,4 +1,4 @@
-# Handoff — Morellia project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration + combat built 2026-08-26, combat hardened + spark added 2026-09-02, worldedit ported + pvp playtest prep + VM right-sized 2026-09-02)
+# Handoff — Nodisium project status (2026-08-06, reverted 2026-08-25, nodes/vanilla ported 2026-08-25/26, monorepo migration + combat built 2026-08-26, combat hardened + spark added 2026-09-02, worldedit ported + pvp playtest prep + VM right-sized 2026-09-02, nodes bug audit re-checked against current code 2026-09-02)
 
 Deep background (library internals, design rationale) is in `RESEARCH.md`, `NODES_DEEP_DIVE.md`,
 `VANILLA_DEEP_DIVE.md`, `COMBAT_DEEP_DIVE.md`, and `research-todo/*.md` — not repeated here. This
@@ -35,11 +35,11 @@ Current state:
   below still describes the target setting. What's gone is the concrete real-world terrain and
   hand-typed/geodata border implementation, plus the from-scratch modeling workflow.
 
-## Status update (2026-08-25/26): nodes/vanilla ported and published, NOT yet in Morellia
+## Status update (2026-08-25/26): nodes/vanilla ported and published, NOT yet in Nodisium
 
 Separate from the terrain/model revert above. Context: `Aechronis/nodes`/`Aechronis/vanilla`/
 `Aechronis/combat`/`Aechronis/utils` — the standalone repos `DCFiendish/nodes`/`DCFiendish/vanilla`
-forked from, and what Morellia's `server/build.gradle.kts` actually pins — were abandoned by
+forked from, and what Nodisium's `server/build.gradle.kts` actually pins — were abandoned by
 upstream on 2026-08-02 in favor of developing directly in a new monorepo, `Aechronis/aechronis`.
 3.5 weeks of real fixes piled up there with no path back to the split repos. This pass ported the
 data-integrity/correctness subset into the forks (not the two large net-new features found along
@@ -83,7 +83,7 @@ not just a local build):
 
 **Done as of 2026-08-26** (items 1-2 from the original "not done yet" list here — superseded by the
 monorepo migration below, which changes what "bump the pin" even means going forward):
-1. Morellia's pins were bumped to `net.aechronis:nodes:6f1f9dd`/`net.aechronis:vanilla:96b593f` and
+1. Nodisium's pins were bumped to `net.aechronis:nodes:6f1f9dd`/`net.aechronis:vanilla:96b593f` and
    the local boot check re-run and confirmed clean (Minestom started, Vanilla modules loaded, the
    local 2-town test fixture loaded, income ticked). Moot now — the monorepo migration below
    replaced both pins with `project(...)` dependencies, so there's no SHA to track anymore.
@@ -107,7 +107,7 @@ monorepo migration below, which changes what "bump the pin" even means going for
 ## Status update (2026-08-26): monorepo migration — nodes/vanilla folded into this repo
 
 Separate decision from the port above: `DCFiendish/nodes`/`DCFiendish/vanilla` (the fork repos)
-have been folded directly into `DCFiendish/Morellia` as real subprojects, mirroring what
+have been folded directly into `DCFiendish/Nodisium` as real subprojects, mirroring what
 `Aechronis/aechronis` itself did. Motivation: every dependency edge between `server`/`nodes`/
 `vanilla` used to require push-to-fork → wait for that fork's own CI to publish to GitHub
 Packages → bump a commit-SHA pin → rebuild — exactly the friction hit firsthand doing the
@@ -144,7 +144,7 @@ project actually owns.
 ## Status update (2026-08-26): `combat` has the same stale-fork problem, decision pending
 
 While starting on gun/melee/vehicle work, checked `Aechronis/combat`'s current state (the repo
-Morellia's `net.aechronis:combat:2c63782` pin points to) — same situation nodes/vanilla were in
+Nodisium's `net.aechronis:combat:2c63782` pin points to) — same situation nodes/vanilla were in
 before their port: master has been stale since 2026-08-01 (`542e3c2`), while **40+ real commits**
 have landed in the `Aechronis/aechronis` monorepo's `modules/combat` since then (most recently
 `556fd05`, 2026-08-24), including two fixes with real security relevance (`COMBAT_DEEP_DIVE.md`'s
@@ -155,7 +155,7 @@ and H5's F-key-swap cooldown bypass, fixed for guns specifically). Full comparis
 **Decision, not yet executed**: rather than forking `Aechronis/combat` the way `nodes`/`vanilla`
 were forked, the plan is to build a **from-scratch `modules/combat`** inside the new monorepo,
 modeled on Aechronis's `Gun`/`Melee`/`Vehicle` API shape but independently implemented — motivated
-both by `Aechronis/combat` being AGPL-3.0 licensed (same as `vanilla`/`utils`, which Morellia
+both by `Aechronis/combat` being AGPL-3.0 licensed (same as `vanilla`/`utils`, which Nodisium
 already depends on, but not something to extend further by choice) and by the chance to design
 around the known CRITICAL/HIGH bugs from the start rather than inheriting and re-fixing them.
 Scope agreed so far: start with just guns and melee (era-appropriate for Agadir Crisis
@@ -233,7 +233,7 @@ working tree (`modules/combat/`, plus edits to `FlagWar.kt`, `TestWeapons.kt`, `
   `{"pack": {"min_format": 69, "max_format": 99, ...}}`, matching what the source pack itself
   shipped for 26.2 compatibility.
 - **Serving it locally**: JDK 25 ships `jwebserver` (`jwebserver -p 8000 -b 127.0.0.1`, run from
-  `server/`) — no Python needed. This process (like the Morellia server itself) has died
+  `server/`) — no Python needed. This process (like the Nodisium server itself) has died
   unexpectedly mid-session more than once with no visible cause; if `ResourcePack.kt` logs
   "Couldn't reach http://localhost:8000/resourcepack.zip", check `jwebserver` is still alive before
   assuming anything else is wrong.
@@ -339,13 +339,13 @@ The "aiming pose never visually changes" bug from the entry above is **resolved*
 mesh-dedup-by-geometry theory was wrong — root cause and fix:
 
 - **Checked `Aechronis/aechronis`'s real, working `ak47`/`ak47-aiming` pair directly** (same
-  `net.minestom:minestom:2026.07.12-26.2` pin Morellia uses). Their two models' `elements` arrays
+  `net.minestom:minestom:2026.07.12-26.2` pin Nodisium uses). Their two models' `elements` arrays
   are **byte-identical** — only `display` differs. So geometry divergence was never required, and a
   same-tick diagnostic swap to `us_trench_knife`'s geometry (which *did* render, just tiny/wrong-
   scaled) was a red herring, not confirmation of the dedup theory.
 - **The real difference**: Aechronis's `ModelManager.updateModel` (`modules/combat/.../tasks/
   ModelManager.kt`) reassigns the held item's model **unconditionally, every tick**, for every
-  online player — not once on a state-transition edge the way Morellia's `AimingListener` did. A
+  online player — not once on a state-transition edge the way Nodisium's `AimingListener` did. A
   one-shot set on the aim-press edge was getting silently lost/stale client-side; continuous
   resend is what makes it actually stick.
 - **Fix**: [Gun.kt](../modules/combat/src/main/kotlin/net/morellia/combat/objects/Gun.kt)'s
@@ -413,7 +413,7 @@ Direct continuation of the entry above, same day.
   "incredibly terrible" — the real determining factor either way is whether the tool call loop
   actually includes a screenshot/render Claude can see, not create-vs-edit per se.
 - **Local dev environment, still running as of end of session** (all separate OS processes, survive
-  regardless of Claude Code session state): the Morellia server (`:server:run`, restarted several
+  regardless of Claude Code session state): the Nodisium server (`:server:run`, restarted several
   times this session, currently serving the resource pack with Springfield's Blockbench-edited
   value), `jwebserver -p 8000` from `server/` serving `resourcepack.zip`, and a Fabric dev client
   (`morellia-testclient`, username `devtest`) connected to `localhost:25567`. Blockbench itself is
@@ -436,7 +436,7 @@ good enough."
   permission. Excluded.
 - TACZ WW1/Great War gunpacks — high quality but **wrong format even if licensing were fine**:
   TACZ renders through its own mesh/GeckoLib pipeline requiring the TACZ Forge/Fabric mod
-  client-side. Morellia serves plain vanilla protocol (Minestom, no mod loader), so players
+  client-side. Nodisium serves plain vanilla protocol (Minestom, no mod loader), so players
   couldn't load these regardless of license.
 - `github.com/Ligua999/Minecraft-Open-Weapons` (billed as free CC0 weapon models) — checked
   directly via GitHub API, repo contains **only a LICENSE file, no actual models**. Dead end.
@@ -452,11 +452,11 @@ good enough."
 [github.com/JagerMeistars/obj-cubed](https://github.com/JagerMeistars/obj-cubed), MIT licensed,
 forked from Godlander's original `objmc`. Bakes actual OBJ/glTF mesh geometry (not Blockbench
 cuboids) into a PNG texture; bundled core shaders decode it client-side at render time. **No mod
-required — pure resource pack**, which is why it's viable for Morellia specifically. Requires
+required — pure resource pack**, which is why it's viable for Nodisium specifically. Requires
 Blockbench 4.8.0+ desktop (Node.js, for its custom PNG encoder) and is GUI-only — confirmed via
 its `package.json` that there is no standalone CLI, so this cannot be automated headlessly; it
 needs a human driving the Blockbench UI. Shaders are version-tuned for MC 26.1.2–26.2, which
-matches Morellia's actual target (see the pack.mcmeta note above) — not a blocker after all.
+matches Nodisium's actual target (see the pack.mcmeta note above) — not a blocker after all.
 
 **Mesh source picked**: [Low-Poly Kar98K by TastyTony](https://sketchfab.com/3d-models/low-poly-kar98k-d0ffca9b52864541ae5adbafb8d14064)
 — **CC-BY 4.0** (attribution required, commercial/redistribution use allowed), 3.5k triangles/1.9k
@@ -1175,8 +1175,8 @@ the container's headroom was thin even before today's `worldedit-core` addition.
   future egg re-import carries it forward, matching the same convention as the dispatcher-threads
   bump.
 - **`dispatcher-threads` deliberately left at 4, not dropped to 3**: this VM is genuinely
-  single-tenant while Morellia runs — the user confirmed `citybuild`/`bannerbound` (this box's other
-  two hosted services) are always stopped whenever Morellia is up, so there's no real core
+  single-tenant while Nodisium runs — the user confirmed `citybuild`/`bannerbound` (this box's other
+  two hosted services) are always stopped whenever Nodisium is up, so there's no real core
   contention to design around, unlike a naive "always leave a core free on a shared box" read of the
   situation. Revisit only if that stop/start discipline ever changes.
 - **What 200 players would actually need — still an open question, not answered today.**
@@ -1189,6 +1189,21 @@ the container's headroom was thin even before today's `worldedit-core` addition.
   existing `morellia-ops` playbook step 6) that this session didn't get to — worth running before
   trusting the new limits at real scale, and worth writing the actual measured result back into
   `RESEARCH.md` §7 once it exists instead of leaving it as a research-only estimate.
+
+## Status update (2026-09-02, continued): nodes CRITICAL/HIGH/MEDIUM bug audit re-checked against current code — nearly all already fixed
+
+`docs/NODES_DEEP_DIVE.md`'s bug catalog (dated 2026-07-30) had gone stale without anyone updating it — it still described bugs as open that were actually fixed in the `DCFiendish/nodes` fork history brought in by the 2026-08-25/26 monorepo migration (`b1d47f77`). Checked every CRITICAL/HIGH/MEDIUM item directly against current `modules/nodes` source (not just re-read the write-up) and updated that doc in place; this entry is the summary, full detail lives there.
+
+**Result: all 3 CRITICAL, 6 of 8 HIGH, and 15 of 20 MEDIUM items are already fixed.** Confirmed fixed: C1 (port-naming), C2 (war-attack persistence lost on restart), C3 (ore anti-dupe cache uncapped + persisted), H1 (non-local return truncating territory load), H2 (uncaught Nation.load exception now caught, can't corrupt saves), H3 (thread-safety — `@Volatile`/`ConcurrentHashMap` throughout), H5 (double-town-membership guard), H6 (quit-handler ConcurrentModificationException), H7 (town destroy/unclaim now coordinate with war state and plots), plus M1-M4, M7-M9, M15-M20.
+
+**Still genuinely open** (confirmed against current code, not just the stale doc):
+- **H4** — no player-facing town leadership transfer exists, only admin-only `/nodesadmin town leader`. An inactive/banned leader permanently soft-locks their town. Real support-burden risk before any real community relies on the town system.
+- **H8** — `Resident.renderMinimaps()` is still an unconditional, un-batched full broadcast to every online player on every war/diplomacy event, no debounce/distance filter. Render-storm risk during a large coordinated siege push.
+- **M10** — `PlayerBlockInteractEvent` still skips wilderness permission checks entirely (looks intentional per an in-source comment, not confirmed as a deliberate design decision).
+- **M12** — home-teleport warmup still only cancels on full-block movement, not sub-block strafing; `EntityTeleportEvent` doesn't cancel it at all.
+- **M13** — friendly-fire listener still has no FlagWar/siege awareness, only static nation/alliance checks — same-nation siege combatants can be unable to damage each other mid-attack.
+
+**Not re-checked**: M5/M6/M11/M14, and the full LOW-severity list (~20 items) in `NODES_DEEP_DIVE.md` — don't assume those are still open just because they're undated; given how much of the rest turned out already fixed, verify against current code before acting on any of them.
 
 ## Theme: the Agadir Crisis (1911), alternate history — locked in
 
@@ -1289,7 +1304,7 @@ tile pyramid — not built, flagged as a future nice-to-have, not requested).
   other projects, plus at least one other tenant's service the user has hosted as a favor (not part
   of this project, never modified — only ever viewed read-only to identify what was already running
   on the shared box before picking nodes-map's own port). **Do not touch anything on this box beyond
-  Morellia's own container/files without explicit confirmation** — it is genuinely multi-tenant.
+  Nodisium's own container/files without explicit confirmation** — it is genuinely multi-tenant.
 - **GitHub**: `gh` CLI already authenticated as `DCFiendish`. Repos:
   - `DCFiendish/nodes` — fork of `Aechronis/nodes`; as of 2026-08-26 its history lives in
     `modules/nodes` here too (subtree-imported), and this is now the stale copy — see the monorepo
@@ -1314,7 +1329,7 @@ Pterodactyl server UUID, volume path, and container ownership details are in
 
 - Docker container ID changes across restarts — always re-fetch via `sudo docker ps`, never reuse
   one from a prior session; verify by volume UUID, not by assuming the first `docker ps` row is
-  Morellia (this box runs multiple containers)
+  Nodisium (this box runs multiple containers)
 - Port: 25567 (tcp + udp), offline-mode auth (`Auth.Offline()`)
 
 ## Gotchas worth remembering (also in `.claude/skills/morellia-ops/SKILL.md`)
@@ -1367,7 +1382,7 @@ Pterodactyl server UUID, volume path, and container ownership details are in
   looked at in-game at all. See the "continued" status update above for exact values and the
   Blockbench MCP connection situation (installed, server reachable, but this session's tool calls
   never actually connected — try `/mcp` before assuming a fresh session is required).
-- **New, 2026-08-25/26, actually next up**: Morellia's own `server/build.gradle.kts` pins are stale
+- **New, 2026-08-25/26, actually next up**: Nodisium's own `server/build.gradle.kts` pins are stale
   against what's now on `nodes`/`vanilla` master (`40b2270`/`a074e09` vs. the current `6f1f9dd`/
   `96b593f`) — see the nodes/vanilla status update above for the exact bump + follow-up work.
 - **Superseded 2026-08-26**: `net.aechronis:combat` is no longer a dependency at all — replaced by
@@ -1394,5 +1409,5 @@ Pterodactyl server UUID, volume path, and container ownership details are in
 - `War-Comms` GitHub repo (empty, 0 bytes) — `gh` lacked the `delete_repo` scope to remove it via
   API; user would need `gh auth refresh -h github.com -s delete_repo` or delete it manually via the
   GitHub UI. Unconfirmed whether this was ever done — check before assuming either way.
-- Task #13 from an earlier session's list: replace the nodes-map loading-screen logo with Morellia
+- Task #13 from an earlier session's list: replace the nodes-map loading-screen logo with Nodisium
   branding — blocked on the user producing artwork.
