@@ -500,6 +500,7 @@ object NodesWorldListener {
         if (town == null) return access == StorageAccess.INTERACT || hasWildernessPermissions(territory)
 
         val resident = Resident.fromPlayer(player) ?: return false
+        if (resident.hasTownPermissionBypass()) return true
 
         val territoryChunk = TerritoryChunk.fromBlock(blockPosition.blockX, blockPosition.blockZ)
         if (territoryChunk != null) {

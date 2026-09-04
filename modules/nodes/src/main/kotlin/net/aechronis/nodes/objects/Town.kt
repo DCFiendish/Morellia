@@ -62,6 +62,9 @@ class Town(
 
         fun fromName(name: String): Town? = Nodes.towns[name]
 
+        // Nodes.towns is keyed by name, not uuid -- towns are few enough that a linear scan is fine.
+        fun fromUuid(uuid: UUID): Town? = Nodes.towns.values.find { it.uuid == uuid }
+
         fun fromPlayer(player: Player): Town? = Resident.fromPlayer(player)?.town
 
         internal fun fromIncomeInventory(inventory: AbstractInventory): Town? = Nodes.towns.values.firstOrNull { town -> town.income.owns(inventory) }
@@ -133,6 +136,9 @@ class Town(
             permissions: MutableMap<TownPermissions, EnumSet<PermissionsGroup>>,
             protectedBlocks: HashSet<BlockVec>,
             plots: ArrayList<Plot.PlotSaveState> = arrayListOf(),
+            lives: Int? = null,
+            capitalLifeGranted: Boolean = false,
+            lifeRevision: Long = 0L,
         ): Town? {
             val leaderResident = leader?.let { Resident.fromUuid(it) }
             val home = Territory.fromId(TerritoryId(homeId))
@@ -194,9 +200,134 @@ class Town(
                 val plot = Plot(state)
                 if (plot.name.isNotBlank() && !town.plots.containsKey(plot.name) && Plot.isValid(town, plot)) town.plots[plot.name] = plot
             }
+            town.lives = lives?.coerceAtLeast(1) ?: 1
+            town.capitalLifeGranted = capitalLifeGranted
+            town.lifeRevision = lifeRevision.coerceAtLeast(0L)
             Nodes.towns[name] = town
             town.needsUpdate()
             return town
+        }
+
+        internal fun initializeCapitalLives(town: Town) {
+            if (town.capitalLifeGranted) return
+            if (town.lives < 2) town.lives = 2
+            town.capitalLifeGranted = true
+            town.lifeRevision++
+            town.needsUpdate()
+            Nodes.needsSave = true
+        }
+
+        internal fun loseLife(town: Town): Int {
+            require(town.lives > 1) { "A town at its final life must be annexed instead of losing another life" }
+            town.lives--
+            town.lifeRevision++
+            town.needsUpdate()
+            Nodes.needsSave = true
+            return town.lives
+        }
+
+        internal fun restoreLives(
+            town: Town,
+            lives: Int,
+            capitalLifeGranted: Boolean,
+            revision: Long,
+        ) {
+            if (revision <= town.lifeRevision) return
+            val restoredLives = lives.coerceAtLeast(1)
+            town.lives = restoredLives
+            town.capitalLifeGranted = capitalLifeGranted
+            town.lifeRevision = revision
+            town.needsUpdate()
+            Nodes.needsSave = true
+        }
+
+        fun setLives(town: Town, lives: Int) {
+            require(lives > 0) { "Town lives must be at least 1" }
+            if (town.lives == lives) return
+            town.lives = lives
+            town.lifeRevision++
+            town.needsUpdate()
+            Nodes.needsSave = true
+            FlagWar.needsSave = true
+        }
+
+        /**
+         * Destroys [defeatedTown] and transfers all of its territories to [annexingTown].
+         * Called when a town has been fully defeated (no lives remaining).
+         */
+        internal fun annex(
+            annexingTown: Town,
+            defeatedTown: Town,
+        ) = synchronized(Nodes.occupationPersistenceLock) {
+            require(annexingTown !== defeatedTown) { "A town cannot annex itself" }
+            require(Nodes.towns[annexingTown.name] === annexingTown) { "The annexing town must still exist" }
+            require(Nodes.towns[defeatedTown.name] === defeatedTown) { "The defeated town must still exist" }
+
+            val transferredTerritories = defeatedTown.territories
+                .mapNotNull(Territory::fromId)
+                .toList()
+
+            destroy(defeatedTown)
+
+            transferredTerritories.forEach { territory ->
+                check(territory.town == null) { "Defeated territory ${territory.id} was not released" }
+                annexingTown.territories.add(territory.id)
+                annexingTown.annexed.add(territory.id)
+                territory.town = annexingTown
+            }
+            annexingTown.needsUpdate()
+            Nodes.needsSave = true
+            Resident.renderMinimaps()
+        }
+
+        /** Moves every territory from [source] to [destination], then destroys [source]. */
+        internal fun merge(destination: Town, source: Town): Int = synchronized(Nodes.occupationPersistenceLock) {
+            require(destination !== source) { "A town cannot merge into itself" }
+            require(Nodes.towns[destination.name] === destination) { "The destination town must still exist" }
+            require(Nodes.towns[source.name] === source) { "The source town must still exist" }
+
+            val transferred = source.territories
+                .mapNotNull(Territory::fromId)
+                .toList()
+
+            transferred.forEach { territory ->
+                // Territory occupations belong to the previous ownership state and must not
+                // survive an administrative ownership transfer.
+                release(territory)
+                source.territories.remove(territory.id)
+                source.annexed.remove(territory.id)
+                destination.territories.add(territory.id)
+                territory.town = destination
+            }
+
+            destroy(source)
+            destination.needsUpdate()
+            Nodes.needsSave = true
+            Resident.renderMinimaps()
+            transferred.size
+        }
+
+        /**
+         * Moves all residents from [source] to [destination] as regular residents.
+         * Leadership and officer roles are deliberately not transferred.
+         */
+        internal fun moveResidents(destination: Town, source: Town): Int {
+            require(destination !== source) { "A town cannot move residents into itself" }
+
+            val transferred = source.residents.toList()
+            setLeader(source, null)
+            transferred.forEach { resident ->
+                removeResident(source, resident)
+                check(addResident(destination, resident)) {
+                    "Could not move resident ${resident.name} from ${source.name} to ${destination.name}"
+                }
+            }
+            if (source.officers.isNotEmpty()) {
+                source.officers.clear()
+                source.needsUpdate()
+                Nodes.needsSave = true
+            }
+            return transferred.size
         }
 
         fun destroy(town: Town) {
@@ -537,6 +668,15 @@ class Town(
     // nation for town
     var nation: Nation? = null
 
+    // Remaining war defeats before the town is annexed. A living town always has at least one.
+    var lives: Int = 1
+        private set
+
+    internal var capitalLifeGranted: Boolean = false
+        private set
+    internal var lifeRevision: Long = 0L
+        private set
+
     // players currently online in town
     val playersOnline: MutableSet<Player> = ConcurrentHashMap.newKeySet()
 
@@ -643,6 +783,7 @@ class Town(
         Message.print(sender, "${ChatColor.BOLD}Town ${this.name}:")
         Message.print(sender, "- Home${ChatColor.WHITE}: Territory (id = ${this.home})")
         Message.print(sender, "- Territories${ChatColor.WHITE}: ${this.territories.size}")
+        Message.print(sender, "- Lives${ChatColor.WHITE}: ${this.lives}")
         Message.print(sender, "- Nation${ChatColor.WHITE}: $nation")
         Message.print(sender, "- Allies${ChatColor.WHITE}: $allies")
         Message.print(sender, "- Enemies${ChatColor.WHITE}: $enemies")
@@ -674,6 +815,9 @@ class Town(
         val territories = t.territories.toList()
         val annexed = t.annexed.toList()
         val captured = t.captured.toList()
+        val lives = t.lives
+        val capitalLifeGranted = t.capitalLifeGranted
+        val lifeRevision = t.lifeRevision
         val income = t.income.snapshot()
         val protectedBlocks: HashSet<BlockVec> = HashSet(t.protectedBlocks)
         val plots: List<Plot.PlotSaveState> = t.plots.values.map { it.getSaveState() }
@@ -711,6 +855,9 @@ class Town(
                     "\"territories\":$territories," +
                     "\"annexed\":$annexed," +
                     "\"captured\":$captured," +
+                    "\"lives\":$lives," +
+                    "\"capitalLifeGranted\":$capitalLifeGranted," +
+                    "\"lifeRevision\":$lifeRevision," +
                     "\"income\":$income," +
                     "\"protect\":${blocksToJsonString(this.protectedBlocks)}," +
                     "\"plots\":[${this.plots.joinToString(",") { it.toJsonString() }}]" +

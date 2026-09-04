@@ -73,6 +73,7 @@ class Nation(
             if (fromName(name) != null) return Result.failure(ErrorNationExists)
 
             val nation = Nation(UUID.randomUUID(), name, town)
+            Town.initializeCapitalLives(town)
             Nodes.nations[name] = nation
             nation.towns.add(town)
             town.nation = nation
@@ -87,6 +88,7 @@ class Nation(
         fun load(uuid: UUID, name: String, capitalName: String, color: Color?, towns: ArrayList<String>): Nation {
             val capital = Town.fromName(capitalName) ?: throw net.aechronis.nodes.constants.ErrorTownDoesNotExist
             val nation = Nation(uuid, name, capital)
+            Town.initializeCapitalLives(capital)
             if (color != null) nation.color = color
             for (townName in towns) {
                 val town = Town.fromName(townName) ?: continue
@@ -143,6 +145,7 @@ class Nation(
                 destroy(nation)
             } else if (town === nation.capital) {
                 nation.capital = nation.towns.first()
+                Town.initializeCapitalLives(nation.capital)
                 nation.capital.residents.forEach { it.player()?.let { player -> Message.print(player, "Your town is now the capital of ${nation.name}") } }
             }
             town.needsUpdate()
@@ -177,6 +180,7 @@ class Nation(
         fun setCapital(nation: Nation, town: Town) {
             if (town.nation !== nation || nation.capital === town) return
             nation.capital = town
+            Town.initializeCapitalLives(town)
             nation.needsUpdate()
             Nodes.needsSave = true
         }

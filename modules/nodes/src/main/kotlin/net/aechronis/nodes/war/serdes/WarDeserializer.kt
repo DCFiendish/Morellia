@@ -8,6 +8,7 @@ package net.aechronis.nodes.war.serdes
 import com.google.gson.JsonParser
 import net.aechronis.nodes.objects.Coord
 import net.aechronis.nodes.objects.TerritoryId
+import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.war.AttackMode
 import net.aechronis.nodes.war.FlagWar
 import net.minestom.server.coordinate.BlockVec
@@ -47,6 +48,35 @@ object WarDeserializer {
                 FlagWar.loadSkirmishTarget(UUID.fromString(nationIdText), TerritoryId(territoryIdJson.asInt))
             }.onFailure { error ->
                 System.err.println("[Nodes] Ignoring invalid skirmish target $nationIdText: ${error.message}")
+            }
+        }
+
+        // ===============================
+        // Town lives (recovery journal -- see WarSerializer's field kdoc). Runs unconditionally:
+        // a life lost right before an abrupt stop must survive even if towns.json never caught up.
+        // ===============================
+        val jsonTownLives = jsonObj.get("townLives")?.asJsonObject
+        jsonTownLives?.entrySet()?.forEach { (townIdText, livesJson) ->
+            runCatching {
+                val town = Town.fromUuid(UUID.fromString(townIdText)) ?: error("unknown town")
+                val lifeState = livesJson.asJsonObject
+                Town.restoreLives(
+                    town,
+                    lifeState.get("lives").asInt,
+                    lifeState.get("capitalGranted")?.asBoolean ?: false,
+                    lifeState.get("revision").asLong,
+                )
+            }.onFailure { error ->
+                System.err.println("[Nodes] Ignoring invalid town lives $townIdText: ${error.message}")
+            }
+        }
+
+        if (warStatus) {
+            jsonObj.get("defeatedTowns")?.asJsonArray?.forEach { townIdJson ->
+                runCatching { FlagWar.loadDefeatedTown(UUID.fromString(townIdJson.asString)) }
+                    .onFailure { error ->
+                        System.err.println("[Nodes] Ignoring invalid defeated town $townIdJson: ${error.message}")
+                    }
             }
         }
 

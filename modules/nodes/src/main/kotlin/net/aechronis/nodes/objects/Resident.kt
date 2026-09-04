@@ -14,6 +14,7 @@ import net.aechronis.nodes.Nodes
 import net.aechronis.nodes.chat.ChatMode
 import net.aechronis.nodes.serdes.SaveState
 import net.aechronis.nodes.utils.ChatColor
+import net.aechronis.utils.hasPermission
 import net.minestom.server.MinecraftServer
 import net.minestom.server.command.CommandSender
 import net.minestom.server.coordinate.Pos
@@ -431,6 +432,9 @@ class Resident(val uuid: UUID, val name: String) {
         Message.print(sender, "- Town${ChatColor.WHITE}: $town")
         Message.print(sender, "- Nation${ChatColor.WHITE}: $nation")
     }
+
+    /** Staff bypass of town permission checks, e.g. `nodes.bypass`. */
+    fun hasTownPermissionBypass(): Boolean = player()?.hasPermission("nodes.bypass") == true
 
     /**
      * Permissions for town protected chests

@@ -14,7 +14,9 @@ import net.aechronis.nodes.objects.Territory
 import net.aechronis.nodes.objects.TerritoryId
 import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.objects.WaypointSharing
+import net.aechronis.nodes.war.AttackMode
 import net.aechronis.nodes.war.FlagWar
+import net.aechronis.nodes.war.TownDefeatOutcome
 import net.aechronis.nodes.war.Warzone
 import net.aechronis.vanilla.listeners.BlockPlacementCooldownListener
 import net.kyori.adventure.bossbar.BossBar
@@ -248,6 +250,100 @@ class NodesTest {
             assertEquals(1, MiningBoostManager.miningMultiplier(now = System.currentTimeMillis() + 120_000))
         } finally {
             MiningBoostManager.reset()
+        }
+    }
+
+    @Test
+    fun `town merge transfers territories and destroys the source town`() {
+        val territories = Nodes.territories.values.filter { it.town == null }.take(2)
+        assertEquals(2, territories.size, "Test world needs two unclaimed territories")
+        val suffix = UUID.randomUUID().toString().take(8)
+        val destination = Town.create("MergeDest$suffix", territories[0], null).getOrThrow()
+        val source = Town.create("MergeSource$suffix", territories[1], null).getOrThrow()
+
+        try {
+            val moved = Town.merge(destination, source)
+            assertEquals(1, moved)
+            assertTrue(destination.territories.contains(territories[1].id))
+            assertEquals(destination, territories[1].town)
+            assertEquals(null, Town.fromName(source.name))
+        } finally {
+            Town.destroy(destination)
+        }
+    }
+
+    @Test
+    fun `town move transfers residents as regular members, not leadership`() {
+        val territories = Nodes.territories.values.filter { it.town == null }.take(2)
+        assertEquals(2, territories.size, "Test world needs two unclaimed territories")
+        val suffix = UUID.randomUUID().toString().take(8)
+        val leader = Resident(UUID.randomUUID(), "move-leader-$suffix")
+        val member = Resident(UUID.randomUUID(), "move-member-$suffix")
+        Nodes.residents[leader.uuid] = leader
+        Nodes.residents[member.uuid] = member
+        val destination = Town.create("MoveDest$suffix", territories[0], null).getOrThrow()
+        val source = Town.create("MoveSource$suffix", territories[1], leader).getOrThrow()
+        source.residents.add(member)
+        member.town = source
+
+        try {
+            val moved = Town.moveResidents(destination, source)
+            assertEquals(2, moved)
+            assertTrue(destination.residents.contains(leader))
+            assertTrue(destination.residents.contains(member))
+            assertEquals(null, source.leader)
+            assertTrue(source.residents.isEmpty())
+        } finally {
+            Town.destroy(destination)
+            Nodes.residents.remove(leader.uuid)
+            Nodes.residents.remove(member.uuid)
+        }
+    }
+
+    @Test
+    fun `town loses a life before being annexed on total defeat`() {
+        val territories = Nodes.territories.values.filter { it.town == null }.take(2)
+        assertEquals(2, territories.size, "Test world needs two unclaimed territories")
+        val suffix = UUID.randomUUID().toString().take(8)
+        val attacker = Town.create("LivesAttacker$suffix", territories[0], null).getOrThrow()
+        val defeated = Town.create("LivesDefeated$suffix", territories[1], null).getOrThrow()
+
+        try {
+            Town.setLives(defeated, 2)
+            assertEquals(2, defeated.lives)
+
+            assertEquals(TownDefeatOutcome.LOST_LIFE, FlagWar.resolveTownDefeat(attacker, defeated, AttackMode.WAR))
+            assertEquals(1, defeated.lives)
+            assertTrue(Nodes.towns.containsKey(defeated.name), "still alive after losing a life")
+
+            // already defeated this war -- no further outcome until re-enabled
+            assertEquals(TownDefeatOutcome.ALREADY_DEFEATED_THIS_WAR, FlagWar.resolveTownDefeat(attacker, defeated, AttackMode.WAR))
+            assertEquals(1, defeated.lives)
+        } finally {
+            FlagWar.disable()
+            if (Nodes.towns.containsKey(defeated.name)) Town.destroy(defeated)
+            Town.destroy(attacker)
+        }
+    }
+
+    @Test
+    fun `town on its final life is annexed on defeat`() {
+        val territories = Nodes.territories.values.filter { it.town == null }.take(2)
+        assertEquals(2, territories.size, "Test world needs two unclaimed territories")
+        val suffix = UUID.randomUUID().toString().take(8)
+        val attacker = Town.create("AnnexAttacker$suffix", territories[0], null).getOrThrow()
+        val defeated = Town.create("AnnexDefeated$suffix", territories[1], null).getOrThrow()
+
+        try {
+            assertEquals(1, defeated.lives, "a fresh town starts at its final life")
+            FlagWar.enable(canAnnexTerritories = true, canOnlyAttackBorders = false, destructionEnabled = false)
+
+            assertEquals(TownDefeatOutcome.ANNEXED, FlagWar.resolveTownDefeat(attacker, defeated, AttackMode.WAR))
+            assertEquals(null, Town.fromName(defeated.name))
+            assertTrue(attacker.territories.contains(territories[1].id))
+        } finally {
+            FlagWar.disable()
+            Town.destroy(attacker)
         }
     }
 

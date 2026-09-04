@@ -78,6 +78,13 @@ internal data class SkirmishTargetSelection(
     val territoryId: TerritoryId,
 )
 
+internal enum class TownDefeatOutcome {
+    ALREADY_DEFEATED_THIS_WAR,
+    LOST_LIFE,
+    ANNEXED,
+    FINAL_LIFE_PROTECTED,
+}
+
 object FlagWar {
 
     // ============================================
@@ -134,6 +141,9 @@ object FlagWar {
     // One target territory per nation for the current border skirmish -- see
     // prepareSkirmishTargetSelection().
     internal val skirmishTargetsByNation: MutableMap<UUID, TerritoryId> = hashMapOf()
+
+    // A town can consume at most one life during one enabled war period.
+    internal val townsDefeatedThisWar: MutableSet<UUID> = hashSetOf()
 
     // attack/flag update tick interval
     internal const val ATTACK_TICK: Int = 20
@@ -199,6 +209,7 @@ object FlagWar {
         blockToAttacker.clear()
         occupiedChunks.clear()
         skirmishTargetsByNation.clear()
+        townsDefeatedThisWar.clear()
 
         if (Files.exists(Nodes.config.pathWar)) {
             WarDeserializer.fromJson(Nodes.config.pathWar)
@@ -279,6 +290,7 @@ object FlagWar {
         blockToAttacker.clear()
         occupiedChunks.clear()
         skirmishTargetsByNation.clear()
+        townsDefeatedThisWar.clear()
     }
 
     /**
@@ -286,6 +298,7 @@ object FlagWar {
      */
     internal fun enable(canAnnexTerritories: Boolean, canOnlyAttackBorders: Boolean, destructionEnabled: Boolean) {
         skirmishTargetsByNation.clear()
+        townsDefeatedThisWar.clear()
         enabled = true
         FlagWar.canAnnexTerritories = canAnnexTerritories
         FlagWar.canOnlyAttackBorders = canOnlyAttackBorders
@@ -337,6 +350,7 @@ object FlagWar {
         blockToAttacker.clear()
         occupiedChunks.clear()
         skirmishTargetsByNation.clear()
+        townsDefeatedThisWar.clear()
         Resident.renderMinimaps()
 
         // save war.json (empty)
@@ -483,6 +497,48 @@ object FlagWar {
     }
 
     internal fun beginWarzoneAttack(attacker: UUID, attackingTown: Town, chunk: TerritoryChunk, flagBase: BlockVec): Result<Attack> = beginAttack(attacker, attackingTown, chunk, flagBase, AttackMode.WARZONE)
+
+    internal fun canAnnexDefeatedTown(mode: AttackMode): Boolean = mode != AttackMode.WAR || canAnnexTerritories
+
+    /**
+     * Resolves a town's core-chunk defeat: annex outright outside normal war (warzone capture of
+     * an unregistered/stopped territory), otherwise consume one of the defeated town's lives, or
+     * annex it once its lives are exhausted. A town can lose at most one life per enabled war
+     * period, tracked in [townsDefeatedThisWar].
+     */
+    internal fun resolveTownDefeat(
+        attackerTown: Town,
+        defeatedTown: Town,
+        mode: AttackMode,
+    ): TownDefeatOutcome {
+        if (mode != AttackMode.WAR) {
+            Town.annex(attackerTown, defeatedTown)
+            WarSerializer.save(false)
+            return TownDefeatOutcome.ANNEXED
+        }
+
+        if (!townsDefeatedThisWar.add(defeatedTown.uuid)) {
+            return TownDefeatOutcome.ALREADY_DEFEATED_THIS_WAR
+        }
+
+        val outcome = when {
+            defeatedTown.lives > 1 -> {
+                Town.loseLife(defeatedTown)
+                TownDefeatOutcome.LOST_LIFE
+            }
+            canAnnexDefeatedTown(mode) -> {
+                Town.annex(attackerTown, defeatedTown)
+                TownDefeatOutcome.ANNEXED
+            }
+            else -> TownDefeatOutcome.FINAL_LIFE_PROTECTED
+        }
+        needsSave = true
+        // Persist the life and per-war defeat marker together. towns.json will catch up
+        // through the normal world save queue; war.json is the journal used to recover
+        // either value after an abrupt stop.
+        WarSerializer.save(false)
+        return outcome
+    }
 
     // Pure attack-time formula, pulled out of createAttack() so it's testable without a live
     // Minestom instance/Territory/Town graph. chunkAttackTimeMs is converted to ticks (20/1000)
@@ -726,6 +782,10 @@ object FlagWar {
         ?.let { nation -> skirmishTargetsByNation[nation.uuid] }
         ?.let(Territory::fromId)
 
+    internal fun loadDefeatedTown(townId: UUID) {
+        if (enabled && Town.fromUuid(townId) != null) townsDefeatedThisWar.add(townId)
+    }
+
     internal fun loadSkirmishTarget(nationId: UUID, territoryId: TerritoryId) {
         if (!enabled || !canOnlyAttackBorders) return
         if (Nation.fromUuid(nationId) == null) {
@@ -737,6 +797,28 @@ object FlagWar {
             return
         }
         skirmishTargetsByNation[nationId] = territoryId
+    }
+
+    /**
+     * A defeated town is only annexed once most of its territory is gone -- home capture alone
+     * annexes it outright, otherwise it needs to have lost more than 70% of its territories.
+     */
+    internal fun shouldAnnexTown(
+        defeatedTown: Town,
+        capturedTerritory: Territory,
+    ): Boolean {
+        if (capturedTerritory.town !== defeatedTown) return false
+        // A town containing any registered warzone must remain a town: annexing it through
+        // another territory would otherwise permanently consume its warzone land.
+        if (Warzone.ownsRegisteredZone(defeatedTown)) return false
+        if (capturedTerritory.id == defeatedTown.home) return true
+
+        val totalTerritories = defeatedTown.territories.size
+        if (totalTerritories == 0) return false
+        val capturedTerritories = defeatedTown.territories.count { territoryId ->
+            Territory.fromId(territoryId)?.occupier?.let { occupier -> occupier !== defeatedTown } == true
+        }
+        return capturedTerritories.toLong() * 10 > totalTerritories.toLong() * 7
     }
 
     // check if chunk was already captured
@@ -1085,6 +1167,27 @@ object FlagWar {
                 // a core-chunk capture of this territory.
                 if (attack.mode == AttackMode.WARZONE) Warzone.onTerritoryOccupied(territory, attackerTown)
                 Message.broadcast("${ChatColor.DARK_RED}$messageContext ${attacker?.name} captured territory (id=${territory.id}) from ${territory.town?.name}!")
+                // Warzones are always occupied, never permanently annexed. This includes a
+                // warzone that is a town's home territory and a stopped warzone later
+                // captured during normal war.
+                if (territoryTown != null && !Warzone.isRegistered(territory) && shouldAnnexTown(territoryTown, territory)) {
+                    val defeatedTownName = territoryTown.name
+                    when (resolveTownDefeat(attackerTown, territoryTown, attack.mode)) {
+                        TownDefeatOutcome.ALREADY_DEFEATED_THIS_WAR -> Unit
+                        TownDefeatOutcome.LOST_LIFE -> Message.broadcast(
+                            "${ChatColor.DARK_RED}[Conquest] $defeatedTownName lost a life and has " +
+                                "${territoryTown.lives} remaining; it cannot lose another life this war!",
+                        )
+                        TownDefeatOutcome.ANNEXED -> Message.broadcast(
+                            "${ChatColor.DARK_RED}[Conquest] ${attackerTown.name} annexed $defeatedTownName; " +
+                                "${attacker?.name ?: attackerTown.name} made the decisive capture!",
+                        )
+                        TownDefeatOutcome.FINAL_LIFE_PROTECTED -> Message.broadcast(
+                            "${ChatColor.DARK_RED}[Conquest] $defeatedTownName was defeated but cannot be annexed " +
+                                "during this war mode; it remains on its final life.",
+                        )
+                    }
+                }
             }
         }
         // else, attacking normal chunk cases:

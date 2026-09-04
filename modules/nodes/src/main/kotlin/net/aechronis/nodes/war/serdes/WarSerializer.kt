@@ -80,6 +80,17 @@ object WarSerializer {
             skirmishTargets[nationId.toString()] = territoryId.toInt()
         }
 
+        // towns that already lost a life this enabled-war period
+        val defeatedTowns: List<String> = FlagWar.townsDefeatedThisWar.map(java.util.UUID::toString).sorted()
+
+        // A full snapshot of every town's lives, re-derivable from towns.json alone, but that
+        // file only saves periodically -- this journal (saved on every needsSave tick) lets a
+        // life lost right before an abrupt stop survive even if towns.json never caught up.
+        val townLives: LinkedHashMap<String, Triple<Int, Boolean, Long>> = linkedMapOf()
+        for (town in Nodes.towns.values) {
+            townLives[town.uuid.toString()] = Triple(town.lives, town.capitalLifeGranted, town.lifeRevision)
+        }
+
         if (async) {
             // write file in worker thread.
             // Was previously unguarded -- any exception thrown mid-write (e.g. a transient disk
@@ -88,19 +99,26 @@ object WarSerializer {
             // flag placed since the last successful save is gone on the next restart.
             CompletableFuture.runAsync {
                 try {
-                    writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList, skirmishTargets)
+                    writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList, skirmishTargets, defeatedTowns, townLives)
                 } catch (err: Exception) {
                     System.err.println("[WAR] Failed to save war state: ${err.message}")
                     err.printStackTrace()
                 }
             }
         } else {
-            writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList, skirmishTargets)
+            writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList, skirmishTargets, defeatedTowns, townLives)
         }
     }
 
     // save war json file synchronously on main thread
-    fun writeToJson(path: Path, occupiedChunks: HashMap<String, ArrayList<Int>>, attacksJsonList: ArrayList<StringBuilder>, skirmishTargets: LinkedHashMap<String, Int> = linkedMapOf()) {
+    fun writeToJson(
+        path: Path,
+        occupiedChunks: HashMap<String, ArrayList<Int>>,
+        attacksJsonList: ArrayList<StringBuilder>,
+        skirmishTargets: LinkedHashMap<String, Int> = linkedMapOf(),
+        defeatedTowns: List<String> = emptyList(),
+        townLives: LinkedHashMap<String, Triple<Int, Boolean, Long>> = linkedMapOf(),
+    ) {
         // =============================================
         // calculate string builder capacity
 
@@ -134,6 +152,16 @@ object WarSerializer {
         // skirmishTargets format: "<nation-uuid>":<territoryId>
         for ((nationId, territoryId) in skirmishTargets) {
             bufferSize += (7 + nationId.length + territoryId.toString().length)
+        }
+
+        // defeatedTowns format: "<town-uuid>",
+        for (townId in defeatedTowns) {
+            bufferSize += (3 + townId.length)
+        }
+
+        // townLives format: "<town-uuid>":{"lives":0,"capitalGranted":false,"revision":0},
+        for ((townId, _) in townLives) {
+            bufferSize += (60 + townId.length)
         }
         // =============================================
 
@@ -188,6 +216,36 @@ object WarSerializer {
         for ((i, entry) in skirmishTargets.entries.withIndex()) {
             jsonString.append(JsonPrimitive(entry.key)).append(":").append(entry.value)
             if (i < skirmishTargets.size - 1) {
+                jsonString.append(",")
+            }
+        }
+
+        jsonString.append("},")
+
+        // ===============================
+        // Defeated towns (per enabled-war period)
+        // ===============================
+        jsonString.append("\"defeatedTowns\":[")
+
+        for ((i, townId) in defeatedTowns.withIndex()) {
+            jsonString.append(JsonPrimitive(townId))
+            if (i < defeatedTowns.size - 1) {
+                jsonString.append(",")
+            }
+        }
+
+        jsonString.append("],")
+
+        // ===============================
+        // Town lives (recovery journal -- see field kdoc above)
+        // ===============================
+        jsonString.append("\"townLives\":{")
+
+        for ((i, entry) in townLives.entries.withIndex()) {
+            val (lives, capitalGranted, revision) = entry.value
+            jsonString.append(JsonPrimitive(entry.key)).append(":")
+            jsonString.append("{\"lives\":$lives,\"capitalGranted\":$capitalGranted,\"revision\":$revision}")
+            if (i < townLives.size - 1) {
                 jsonString.append(",")
             }
         }

@@ -170,6 +170,9 @@ class NodesAdminTownCommand : NodesCommand("town", "nodes.admin") {
             Message.print(player, "/nodesadmin town open${ChatColor.WHITE}: Toggle town is open to join")
             Message.print(player, "/nodesadmin town income${ChatColor.WHITE}: View a town's income inventory")
             Message.print(player, "/nodesadmin town plot${ChatColor.WHITE}: Manage a town's plots")
+            Message.print(player, "/nodesadmin town merge${ChatColor.WHITE}: Merge townB's territories into townA, deleting townB")
+            Message.print(player, "/nodesadmin town move${ChatColor.WHITE}: Move all of townB's residents into townA as regular residents")
+            Message.print(player, "/nodesadmin town lives${ChatColor.WHITE}: Set a town's remaining lives")
             Message.print(player, "Run a command with no args to see usage.")
         }
 
@@ -193,6 +196,78 @@ class NodesAdminTownCommand : NodesCommand("town", "nodes.admin") {
         addSubcommand(NodesAdminTownSetHomeCommand())
         addSubcommand(NodesAdminTownDefaultTownSpawnsCommand())
         addSubcommand(NodesAdminTownPlotCommand())
+        addSubcommand(NodesAdminTownMergeCommand())
+        addSubcommand(NodesAdminTownMoveCommand())
+        addSubcommand(NodesAdminTownLivesCommand())
+    }
+}
+
+class NodesAdminTownMergeCommand : NodesCommand("merge", "nodes.admin") {
+    init {
+        setDefaultExecutor { player, _, _ ->
+            Message.print(player, "Usage: /nodesadmin town merge <townA> <townB>")
+        }
+
+        val destinationArg = ArgumentTown.create("townA")
+        val sourceArg = ArgumentTown.create("townB")
+
+        addSyntax({ player, _, context ->
+            val destination = context[destinationArg]
+            val source = context[sourceArg]
+            if (destination === source) {
+                Message.error(player, "Town A and Town B must be different towns")
+                return@addSyntax
+            }
+
+            val moved = Town.merge(destination, source)
+            Message.print(player, "Merged all $moved territories from ${source.name} into ${destination.name} and deleted ${source.name}")
+        }, destinationArg, sourceArg)
+    }
+}
+
+class NodesAdminTownMoveCommand : NodesCommand("move", "nodes.admin") {
+    init {
+        setDefaultExecutor { player, _, _ ->
+            Message.print(player, "Usage: /nodesadmin town move <townA> <townB>")
+        }
+
+        val destinationArg = ArgumentTown.create("townA")
+        val sourceArg = ArgumentTown.create("townB")
+
+        addSyntax({ player, _, context ->
+            val destination = context[destinationArg]
+            val source = context[sourceArg]
+            if (destination === source) {
+                Message.error(player, "Town A and Town B must be different towns")
+                return@addSyntax
+            }
+
+            val moved = Town.moveResidents(destination, source)
+            Message.print(player, "Moved $moved residents from ${source.name} to ${destination.name} as regular residents")
+        }, destinationArg, sourceArg)
+    }
+}
+
+class NodesAdminTownLivesCommand : NodesCommand("lives", "nodes.admin") {
+    init {
+        setDefaultExecutor { player, _, _ ->
+            Message.print(player, "Usage: /nodesadmin town lives <town-name> <number>")
+        }
+
+        val townArg = ArgumentTown.create("town-name")
+        val livesArg = ArgumentType.Integer("number")
+
+        addSyntax({ player, _, context ->
+            val lives = context[livesArg]
+            if (lives < 1) {
+                Message.error(player, "Town lives must be at least 1")
+                return@addSyntax
+            }
+
+            val town = context[townArg]
+            Town.setLives(town, lives)
+            Message.print(player, "Set ${town.name}'s remaining lives to $lives")
+        }, townArg, livesArg)
     }
 }
 

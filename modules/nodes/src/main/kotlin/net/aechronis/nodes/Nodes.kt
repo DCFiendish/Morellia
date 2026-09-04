@@ -76,6 +76,11 @@ object Nodes {
     val eventNode = EventNode.all("nodes")
     val highPriorityEventNode = EventNode.all("nodes-high-priority").setPriority(-999)
 
+    // Runs right after highPriorityEventNode's own permission checks but before general/low
+    // priority listeners -- e.g. NodesChestProtectionDestroyListener needs to see a protected-chest
+    // break before Vanilla's barrel storage handler (on eventNode) converts it into a manual drop.
+    val postPermissionEventNode = EventNode.all("nodes-post-permission").setPriority(-998)
+
     // resourceNodes/territoryChunks/territories/towns/nations/residents/buildings are ALL
     // cleared and rebuilt together by loadWorld() (see its kdoc), reachable live via
     // /nodesadmin load (nodes.admin permission -- not console/startup-only) while players stay
@@ -100,6 +105,10 @@ object Nodes {
     internal val residents: ConcurrentHashMap<UUID, Resident> = ConcurrentHashMap()
     internal val buildings: CopyOnWriteArrayList<Building> = CopyOnWriteArrayList()
     internal val minimapBuildingsByChunk: ConcurrentHashMap<Coord, Building> = ConcurrentHashMap()
+
+    // Guards Town.annex/merge/release-style territory-ownership transfers so an admin merge/move
+    // can't interleave with a concurrent war capture touching the same territory.
+    internal val occupationPersistenceLock = Any()
 
     // Both were plain HashMap -- playerWarpTasks is read/written from PortWarpCommand's per-player
     // command executor (a different thread per player, same territories/territoryChunks concern
@@ -158,6 +167,7 @@ object Nodes {
         MinecraftServer.getGlobalEventHandler().addChild(lowPriorityEventNode)
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
         MinecraftServer.getGlobalEventHandler().addChild(highPriorityEventNode)
+        MinecraftServer.getGlobalEventHandler().addChild(postPermissionEventNode)
         MinimapPassengerTracker.init()
         RelationshipHitbox.init()
         NodesChatListener.init()
