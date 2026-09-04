@@ -36,6 +36,10 @@ class Nation(
 
         fun fromName(name: String): Nation? = Nodes.nations[name]
 
+        // Nodes.nations is keyed by name, not uuid -- nations are few enough
+        // (dozens at most) that a linear scan here is fine.
+        fun fromUuid(uuid: UUID): Nation? = Nodes.nations.values.find { it.uuid == uuid }
+
         private fun indexTownMembers(nation: Nation, town: Town) {
             val indexedPlayers = town.playersOnline.associateBy { it.uuid }
             town.residents.forEach { resident ->

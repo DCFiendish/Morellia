@@ -14,6 +14,7 @@ import net.aechronis.nodes.objects.TerritoryId
 import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.objects.WaypointSharing
 import net.aechronis.nodes.war.FlagWar
+import net.aechronis.nodes.war.Warzone
 import net.aechronis.vanilla.listeners.BlockPlacementCooldownListener
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
@@ -47,6 +48,7 @@ import java.util.UUID
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -224,6 +226,94 @@ class NodesTest {
         Plot.setPlayerPermissions(town, plot, resident, allPermissions, true)
         for (permission in allPermissions) {
             assertEquals(true, plot.playerPermission(resident.uuid, permission))
+        }
+    }
+
+    @Test
+    fun `border skirmish locks each nation to one target territory`() {
+        val territories = Nodes.territories.values.filter { it.town == null }.take(3)
+        assertEquals(3, territories.size, "Test world needs three unclaimed territories")
+        val suffix = UUID.randomUUID().toString().take(8)
+        val leader = Resident(UUID.randomUUID(), "skirmish-leader-$suffix")
+        val member = Resident(UUID.randomUUID(), "skirmish-member-$suffix")
+        Nodes.residents[leader.uuid] = leader
+        Nodes.residents[member.uuid] = member
+        val town = Town.create("SkirmishTown$suffix", territories[0], leader).getOrThrow()
+        town.residents.add(member)
+        member.town = town
+        val nation = Nation.create("SkirmishNation$suffix", town).getOrThrow()
+
+        try {
+            FlagWar.enable(canAnnexTerritories = false, canOnlyAttackBorders = true, destructionEnabled = false)
+
+            // a regular member (not leader/officer) can't make the first selection
+            val memberAttempt = FlagWar.prepareSkirmishTargetSelection(member.uuid, town, territories[1])
+            assertTrue(memberAttempt.isFailure)
+
+            // the leader selects territories[1] as the nation's target
+            val leaderSelection = FlagWar.prepareSkirmishTargetSelection(leader.uuid, town, territories[1]).getOrThrow()
+            assertNotNull(leaderSelection)
+            assertTrue(FlagWar.commitSkirmishTargetSelection(leaderSelection))
+            assertEquals(territories[1], FlagWar.skirmishTarget(town))
+
+            // re-selecting the same territory is a no-op success
+            val reselect = FlagWar.prepareSkirmishTargetSelection(leader.uuid, town, territories[1])
+            assertTrue(reselect.isSuccess)
+            assertEquals(null, reselect.getOrThrow())
+
+            // selecting a different territory is locked out
+            val locked = FlagWar.prepareSkirmishTargetSelection(leader.uuid, town, territories[2])
+            assertTrue(locked.isFailure)
+        } finally {
+            FlagWar.disable()
+            Nation.destroy(nation)
+            Town.destroy(town)
+            Nodes.residents.remove(leader.uuid)
+            Nodes.residents.remove(member.uuid)
+        }
+    }
+
+    @Test
+    fun `warzone tracks nation occupation time and awards the leader on stop`() {
+        val territories = Nodes.territories.values.filter { it.town == null }.take(2)
+        assertEquals(2, territories.size, "Test world needs two unclaimed territories")
+        val suffix = UUID.randomUUID().toString().take(8)
+        val firstTown = Town.create("WarzoneFirst$suffix", territories[0], null).getOrThrow()
+        val secondTown = Town.create("WarzoneSecond$suffix", territories[1], null).getOrThrow()
+        val firstNation = Nation.create("WarzoneNationFirst$suffix", firstTown).getOrThrow()
+        val secondNation = Nation.create("WarzoneNationSecond$suffix", secondTown).getOrThrow()
+        val territory = territories[0]
+        val now = System.currentTimeMillis()
+
+        try {
+            Warzone.register(listOf(territory))
+            assertTrue(Warzone.isActive(territory))
+            assertTrue(Warzone.isRegistered(territory))
+
+            // first nation holds it for 5s, then hands off to the second for 3s
+            Warzone.onTerritoryOccupied(territory, firstTown, now)
+            Warzone.onTerritoryOccupied(territory, secondTown, now + 5_000L)
+
+            val ranking = Warzone.ranking(territory, now + 8_000L)
+            assertEquals(firstNation, ranking[0].nation)
+            assertEquals(5_000L, ranking[0].millis)
+            assertEquals(secondNation, ranking[1].nation)
+            assertEquals(3_000L, ranking[1].millis)
+
+            val winner = Warzone.stop(territory, now + 8_000L).getOrThrow()
+            assertEquals(firstNation, winner)
+            assertFalse(Warzone.isActive(territory))
+            assertTrue(Warzone.isRegistered(territory), "Stopped warzone stays registered/protected")
+
+            // a stopped warzone can't be stopped again
+            assertTrue(Warzone.stop(territory).isFailure)
+        } finally {
+            Warzone.resetForReload()
+            Files.deleteIfExists(Nodes.config.pathWarzone)
+            Nation.destroy(firstNation)
+            Nation.destroy(secondNation)
+            Town.destroy(firstTown)
+            Town.destroy(secondTown)
         }
     }
 

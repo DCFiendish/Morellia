@@ -28,6 +28,7 @@ import net.aechronis.nodes.objects.Territory
 import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.utils.ChatColor
 import net.aechronis.nodes.war.FlagWar
+import net.aechronis.nodes.war.Warzone
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.sound.Sound
 import net.minestom.server.adventure.audience.Audiences
@@ -45,6 +46,7 @@ class NodesAdminCommand : NodesCommand("nodesadmin", "nodes.admin", "nda") {
             Message.print(player, "/nodesadmin save${ChatColor.WHITE}: Force save world")
             Message.print(player, "/nodesadmin load${ChatColor.WHITE}: Force load world")
             Message.print(player, "/nodesadmin runincome${ChatColor.WHITE}: Runs income for all towns")
+            Message.print(player, "/nodesadmin warzone${ChatColor.WHITE}: Manage warzones")
         }
 
         addSubcommand(NodesAdminHelpCommand())
@@ -55,6 +57,7 @@ class NodesAdminCommand : NodesCommand("nodesadmin", "nodes.admin", "nda") {
         addSubcommand(NodesAdminSaveCommand())
         addSubcommand(NodesAdminLoadCommand())
         addSubcommand(NodesAdminRunIncomeCommand())
+        addSubcommand(NodesAdminWarzoneCommand())
     }
 }
 
@@ -224,8 +227,13 @@ class NodesAdminTownDeleteCommand : NodesCommand("delete", "nodes.admin") {
         val townArg = ArgumentTown.create("town-name")
 
         addSyntax({ player, resident, context ->
-            Town.destroy(context[townArg])
-            Message.print(player, "Town \"${context[townArg].name}\" has been deleted")
+            val town = context[townArg]
+            if (Warzone.ownsRegisteredZone(town)) {
+                Message.error(player, "Cannot delete ${town.name}: warzone territories must remain inside a town")
+                return@addSyntax
+            }
+            Town.destroy(town)
+            Message.print(player, "Town \"${town.name}\" has been deleted")
         }, townArg)
     }
 }

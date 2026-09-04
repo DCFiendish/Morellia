@@ -7,6 +7,8 @@ package net.aechronis.nodes.war.serdes
 
 import com.google.gson.JsonParser
 import net.aechronis.nodes.objects.Coord
+import net.aechronis.nodes.objects.TerritoryId
+import net.aechronis.nodes.war.AttackMode
 import net.aechronis.nodes.war.FlagWar
 import net.minestom.server.coordinate.BlockVec
 import java.io.FileReader
@@ -22,17 +24,31 @@ object WarDeserializer {
 
         // parse war state and flags
         val warStatus = jsonObj.get("war")?.asBoolean ?: false
-        if (!warStatus) {
-            return
+        if (warStatus) {
+            // parse war flags
+            val canAnnexTerritories = jsonObj.get("flagAnnex")?.asBoolean ?: true
+            val canOnlyAttackBorders = jsonObj.get("flagBordersOnly")?.asBoolean ?: false
+            val destructionEnabled = jsonObj.get("flagDestruction")?.asBoolean ?: true
+
+            // war enabled, parse full state
+            FlagWar.enable(canAnnexTerritories, canOnlyAttackBorders, destructionEnabled)
         }
 
-        // parse war flags
-        val canAnnexTerritories = jsonObj.get("flagAnnex")?.asBoolean ?: true
-        val canOnlyAttackBorders = jsonObj.get("flagBordersOnly")?.asBoolean ?: false
-        val destructionEnabled = jsonObj.get("flagDestruction")?.asBoolean ?: true
+        // Occupied chunks and in-progress attacks are saved regardless of
+        // whether global war is enabled -- a warzone runs independently of
+        // FlagWar.enabled, so its state must reload even when war is off.
 
-        // war enabled, parse full state
-        FlagWar.enable(canAnnexTerritories, canOnlyAttackBorders, destructionEnabled)
+        // ===============================
+        // Skirmish targets
+        // ===============================
+        val jsonSkirmishTargets = jsonObj.get("skirmishTargets")?.asJsonObject
+        jsonSkirmishTargets?.entrySet()?.forEach { (nationIdText, territoryIdJson) ->
+            runCatching {
+                FlagWar.loadSkirmishTarget(UUID.fromString(nationIdText), TerritoryId(territoryIdJson.asInt))
+            }.onFailure { error ->
+                System.err.println("[Nodes] Ignoring invalid skirmish target $nationIdText: ${error.message}")
+            }
+        }
 
         // ===============================
         // Occupied chunks
@@ -69,8 +85,11 @@ object WarDeserializer {
                 val bJson = attackObj.get("b").asJsonArray
                 val flagBase = BlockVec(bJson[0].asInt, bJson[1].asInt, bJson[2].asInt)
                 val completionTime = attackObj.get("t").asLong
+                val mode = attackObj.get("mode")?.asString
+                    ?.let { runCatching { AttackMode.valueOf(it) }.getOrNull() }
+                    ?: AttackMode.WAR
 
-                FlagWar.loadAttack(attacker, coord, flagBase, completionTime)
+                FlagWar.loadAttack(attacker, coord, flagBase, completionTime, mode)
             }
         }
     }

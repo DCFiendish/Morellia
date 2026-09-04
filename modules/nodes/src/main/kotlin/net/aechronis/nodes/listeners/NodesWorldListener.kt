@@ -19,6 +19,9 @@ import net.aechronis.nodes.constants.ErrorFlagTooHigh
 import net.aechronis.nodes.constants.ErrorNoTerritory
 import net.aechronis.nodes.constants.ErrorNotBorderTerritory
 import net.aechronis.nodes.constants.ErrorNotEnemy
+import net.aechronis.nodes.constants.ErrorSkirmishNationRequired
+import net.aechronis.nodes.constants.ErrorSkirmishTargetLocked
+import net.aechronis.nodes.constants.ErrorSkirmishTargetSelectionRole
 import net.aechronis.nodes.constants.ErrorSkyBlocked
 import net.aechronis.nodes.constants.ErrorTooManyAttacks
 import net.aechronis.nodes.constants.ErrorTownBlacklisted
@@ -35,6 +38,7 @@ import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.utils.ChatColor
 import net.aechronis.nodes.war.Attack
 import net.aechronis.nodes.war.FlagWar
+import net.aechronis.nodes.war.Warzone
 import net.aechronis.vanilla.managers.StorageAccess
 import net.minestom.server.MinecraftServer
 import net.minestom.server.component.DataComponents
@@ -58,8 +62,8 @@ object NodesWorldListener {
         val blockPos = event.blockPosition
         val territoryChunk = TerritoryChunk.fromBlock(blockPos.blockX, blockPos.blockZ)
 
-        // if war enabled, and chunk is being attacked, do flag checks
-        if (FlagWar.enabled && territoryChunk?.attacker !== null) {
+        // if chunk is being attacked (normal war or a warzone), do flag checks
+        if (territoryChunk?.attacker !== null) {
             val attack = FlagWar.chunkToAttacker.get(territoryChunk.coord)!!
 
             if (blockInWarFlagNoBuildRegion(blockPos, attack)) {
@@ -126,6 +130,16 @@ object NodesWorldListener {
                 return
             }
 
+            // A completed warzone occupation is controlled by the capturing
+            // town, not by the original owner or its plots.
+            val warzoneOccupierTown = territoryChunk?.let { warzoneOccupier(territory, it) }
+            if (warzoneOccupierTown != null) {
+                if (hasTownPermissions(TownPermissions.DESTROY, warzoneOccupierTown, resident)) return
+                event.isCancelled = true
+                Message.error(player, "You cannot destroy here!")
+                return
+            }
+
             // territory occupier permissions
             val occupier: Town? = territory.occupier
             if (occupier !== null && hasOccupierPermissions(TownPermissions.DESTROY, town, occupier, resident)) {
@@ -170,10 +184,11 @@ object NodesWorldListener {
         val player: Player = event.player
         if (Nodes.config.adminUsernames.contains(player.username)) return
 
-        // war specific tasks
-        if (FlagWar.enabled) {
+        // war/warzone specific tasks
+        run {
             val territoryChunk = TerritoryChunk.fromBlock(blockPos.blockX, blockPos.blockZ)
-            if (territoryChunk !== null) {
+            val isWarzone = territoryChunk?.territory?.let(Warzone::isActive) == true
+            if ((FlagWar.enabled || isWarzone) && territoryChunk !== null) {
                 // disable block placement in flag no build distance
                 if (territoryChunk.attacker !== null) {
                     val attack = FlagWar.chunkToAttacker.get(territoryChunk.coord)
@@ -195,62 +210,90 @@ object NodesWorldListener {
                     if (resident !== null) {
                         val town = resident.town
                         if (town !== null) {
-                            val result = FlagWar.beginAttack(player.uuid, town, territoryChunk, blockPos)
+                            val context = if (isWarzone) "[Warzone]" else "[War]"
+                            val result = if (isWarzone) {
+                                FlagWar.beginWarzoneAttack(player.uuid, town, territoryChunk, blockPos)
+                            } else {
+                                FlagWar.beginAttack(player.uuid, town, territoryChunk, blockPos)
+                            }
                             if (result.isSuccess) {
                                 // get town being attacked
                                 val townAttacked = territoryChunk.territory.town!!
 
                                 // reclaiming your town
                                 if (townAttacked === town) {
-                                    Message.broadcast("${ChatColor.DARK_RED}[War] ${event.player.username} is liberating ${townAttacked.name} at (${blockPos.blockX}, ${blockPos.blockY}, ${blockPos.blockZ})")
+                                    Message.broadcast("${ChatColor.DARK_RED}$context ${event.player.username} is liberating ${townAttacked.name} at (${blockPos.blockX}, ${blockPos.blockY}, ${blockPos.blockZ})")
+                                } else if (isWarzone) {
+                                    Message.broadcast("${ChatColor.DARK_RED}$context ${event.player.username} is capturing warzone ${townAttacked.name} at (${blockPos.blockX}, ${blockPos.blockY}, ${blockPos.blockZ})")
                                 } else { // attacking enemy
-                                    Message.broadcast("${ChatColor.DARK_RED}[War] ${event.player.username} is attacking ${townAttacked.name} at (${blockPos.blockX}, ${blockPos.blockY}, ${blockPos.blockZ})")
+                                    Message.broadcast("${ChatColor.DARK_RED}$context ${event.player.username} is attacking ${townAttacked.name} at (${blockPos.blockX}, ${blockPos.blockY}, ${blockPos.blockZ})")
                                 }
                             } else {
                                 when (result.exceptionOrNull()) {
-                                    ErrorNoTerritory -> Message.error(player, "[War] There is no territory here")
+                                    ErrorNoTerritory -> Message.error(player, "$context There is no territory here")
 
-                                    ErrorAlreadyUnderAttack -> Message.error(player, "[War] Chunk already under attack")
+                                    ErrorAlreadyUnderAttack -> Message.error(player, "$context Chunk already under attack")
 
                                     ErrorAlreadyCaptured -> Message.error(
                                         player,
-                                        "[War] Chunk already captured by town or allies",
+                                        "$context Chunk already captured by town or allies",
                                     )
 
                                     ErrorTownBlacklisted -> Message.error(
                                         player,
-                                        "[War] Cannot attack this town (blacklisted)",
+                                        "$context Cannot attack this town (blacklisted)",
                                     )
 
                                     ErrorTownNotWhitelisted -> Message.error(
                                         player,
-                                        "[War] Cannot attack this town (not whitelisted)",
+                                        "$context Cannot attack this town (not whitelisted)",
                                     )
 
-                                    ErrorNotEnemy -> Message.error(player, "[War] Chunk does not belong to an enemy")
+                                    ErrorNotEnemy -> Message.error(
+                                        player,
+                                        if (isWarzone) "$context You must be in a nation to capture this warzone" else "$context Chunk does not belong to an enemy",
+                                    )
 
-                                    ErrorAnnexDisabled -> Message.error(player, "[War] Territory annexing is disabled")
+                                    ErrorAnnexDisabled -> Message.error(player, "$context Territory annexing is disabled")
 
                                     ErrorNotBorderTerritory -> Message.error(
                                         player,
-                                        "[War] You can only attack border territories",
+                                        "$context You can only attack border territories",
                                     )
+
+                                    ErrorSkirmishNationRequired -> Message.error(
+                                        player,
+                                        "$context You must be in a nation to attack during a border skirmish",
+                                    )
+
+                                    ErrorSkirmishTargetSelectionRole -> Message.error(
+                                        player,
+                                        "$context A town leader or officer must place the first flag to select your nation's target",
+                                    )
+
+                                    ErrorSkirmishTargetLocked -> {
+                                        val selected = FlagWar.skirmishTarget(town)
+                                        Message.error(
+                                            player,
+                                            "$context Your nation can only attack ${selected?.name ?: "its selected territory"} during this skirmish",
+                                        )
+                                    }
 
                                     ErrorChunkNotEdge -> Message.error(
                                         player,
-                                        "[War] Must attack from territory edge or from captured chunk",
+                                        "$context Must attack from territory edge or from captured chunk",
                                     )
 
                                     ErrorFlagTooHigh -> Message.error(
                                         player,
-                                        "[War] Flag placement too high, cannot create flag",
+                                        "$context Flag placement too high, cannot create flag",
                                     )
 
-                                    ErrorSkyBlocked -> Message.error(player, "[War] Flag must see the sky")
+                                    ErrorSkyBlocked -> Message.error(player, "$context Flag must see the sky")
 
                                     ErrorTooManyAttacks -> Message.error(
                                         player,
-                                        "[War] You cannot attack any more chunks at the same time",
+                                        "$context You cannot attack any more chunks at the same time",
                                     )
                                 }
 
@@ -301,6 +344,17 @@ object NodesWorldListener {
                 return
             }
 
+            // Warzone occupations use the capturing town's ordinary
+            // permissions, rather than the owner town's permissions.
+            val warzoneOccupierTown = territoryChunk?.let { warzoneOccupier(territory, it) }
+            if (warzoneOccupierTown != null) {
+                if (hasTownPermissions(TownPermissions.BUILD, warzoneOccupierTown, resident)) return
+                NodesBlockPlacementCooldownListener.apply(player, blockPos.blockX, blockPos.blockZ)
+                event.isCancelled = true
+                Message.error(player, "You cannot build here!")
+                return
+            }
+
             // territory occupier permissions
             val occupier: Town? = territory.occupier
             if (occupier !== null && hasOccupierPermissions(TownPermissions.BUILD, town, occupier, resident)) {
@@ -312,8 +366,8 @@ object NodesWorldListener {
                 return
             }
 
-            // ignore if war enabled and item in hand is a flag material
-            if (FlagWar.enabled && Nodes.config.flagBlocks.contains(block)) {
+            // ignore if war/warzone enabled and item in hand is a flag material
+            if ((FlagWar.enabled || Warzone.isActive(territory)) && Nodes.config.flagBlocks.contains(block)) {
                 return
             }
         }
@@ -360,6 +414,26 @@ object NodesWorldListener {
             }
 
             val plot = Plot.at(town, event.blockPosition.blockX, event.blockPosition.blockY, event.blockPosition.blockZ)
+
+            // Warzone occupations use the capturing town's ordinary
+            // permissions, rather than the owner town's permissions.
+            val warzoneOccupierTown = warzoneOccupier(territory, territoryChunk!!)
+            if (warzoneOccupierTown != null) {
+                val permission = if (PROTECTED_BLOCKS.any { event.block.compare(it) }) TownPermissions.CHESTS else TownPermissions.INTERACT
+                if (!hasTownPermissions(permission, warzoneOccupierTown, resident)) {
+                    event.isCancelled = true
+                    Message.error(event.player, if (permission == TownPermissions.CHESTS) "You cannot use chests here!" else "You cannot interact here!")
+                    return
+                }
+                if (permission == TownPermissions.CHESTS &&
+                    warzoneOccupierTown.protectedBlocks.contains(event.blockPosition) &&
+                    !resident.hasTownProtectedChestPermissions(warzoneOccupierTown)
+                ) {
+                    event.isCancelled = true
+                    Message.error(event.player, "This chest is for trusted residents only")
+                }
+                return
+            }
 
             // special permissions for using chests, furnaces, etc...
             if (PROTECTED_BLOCKS.any { event.block.compare(it) }) {
@@ -427,7 +501,15 @@ object NodesWorldListener {
         val resident = Resident.fromPlayer(player) ?: return false
 
         val territoryChunk = TerritoryChunk.fromBlock(blockPosition.blockX, blockPosition.blockZ)
-        if (territoryChunk != null && hasWarPermissions(resident, territory, territoryChunk)) return true
+        if (territoryChunk != null) {
+            val warzoneOccupierTown = warzoneOccupier(territory, territoryChunk)
+            if (warzoneOccupierTown != null) {
+                val permission = if (access == StorageAccess.INTERACT) TownPermissions.CHESTS else TownPermissions.DESTROY
+                return hasTownPermissions(permission, warzoneOccupierTown, resident) &&
+                    (!warzoneOccupierTown.protectedBlocks.contains(blockPosition) || resident.hasTownProtectedChestPermissions(warzoneOccupierTown))
+            }
+            if (hasWarPermissions(resident, territory, territoryChunk)) return true
+        }
 
         val permission = if (access == StorageAccess.INTERACT) TownPermissions.CHESTS else TownPermissions.DESTROY
         val plotPermission = Plot.at(town, blockPosition.blockX, blockPosition.blockY, blockPosition.blockZ)
@@ -532,6 +614,14 @@ private fun hasOccupierPermissions(perms: TownPermissions, town: Town, occupier:
     false
 }
 
+/**
+ * Warzones run outside global FlagWar, so their settled occupations must not
+ * depend on FlagWar.enabled or the optional occupied-town control list.
+ * Chunk occupation takes precedence until a core capture occupies the whole
+ * territory.
+ */
+internal fun warzoneOccupier(territory: Territory, territoryChunk: TerritoryChunk): Town? = if (Warzone.isActive(territory)) territoryChunk.occupier ?: territory.occupier else null
+
 // bypass permissions and allow all interaction in
 // captured chunks/territories during wartime
 private fun hasWarPermissions(resident: Resident, territory: Territory, territoryChunk: TerritoryChunk): Boolean {
@@ -619,14 +709,22 @@ private fun handleHiddenOre(player: Player, block: BlockVec) {
 
         val playerTown = Town.fromPlayer(player)
         val playerNation = playerTown?.nation
+        val warzoneOccupierTown = TerritoryChunk.fromBlock(blockX, blockZ)?.let { warzoneOccupier(territory, it) }
 
         // conditions allowed for mining ore
         if ((Nodes.config.allowOreInWilderness && territoryTown === null) ||
             (territoryTown !== null && territoryTown === playerTown) ||
             (Nodes.config.allowOreInNationTowns && territoryNation !== null && territoryNation === playerNation) ||
-            (Nodes.config.allowOreInCaptured && territory.occupier === playerTown)
+            (Nodes.config.allowOreInCaptured && (territory.occupier === playerTown || warzoneOccupierTown === playerTown))
         ) {
-            val itemDrops = territory.ores.sample(blockY)
+            val rateMultiplier = Warzone.multiplierFor(territory)
+            val itemDrops = territory.ores.sample(blockY).map { itemStack ->
+                if (rateMultiplier == 1.0) {
+                    itemStack
+                } else {
+                    itemStack.withAmount((itemStack.amount() * rateMultiplier).toInt().coerceAtLeast(1))
+                }
+            }
 
             // do tax event check
             val territoryOccupier = territory.occupier

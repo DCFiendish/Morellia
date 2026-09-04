@@ -74,6 +74,12 @@ object WarSerializer {
             attacksJsonList.add(attack.toJson())
         }
 
+        // one target territory per nation, for the current border skirmish
+        val skirmishTargets: LinkedHashMap<String, Int> = linkedMapOf()
+        for ((nationId, territoryId) in FlagWar.skirmishTargetsByNation) {
+            skirmishTargets[nationId.toString()] = territoryId.toInt()
+        }
+
         if (async) {
             // write file in worker thread.
             // Was previously unguarded -- any exception thrown mid-write (e.g. a transient disk
@@ -82,19 +88,19 @@ object WarSerializer {
             // flag placed since the last successful save is gone on the next restart.
             CompletableFuture.runAsync {
                 try {
-                    writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList)
+                    writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList, skirmishTargets)
                 } catch (err: Exception) {
                     System.err.println("[WAR] Failed to save war state: ${err.message}")
                     err.printStackTrace()
                 }
             }
         } else {
-            writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList)
+            writeToJson(Nodes.config.pathWar, occupiedChunks, attacksJsonList, skirmishTargets)
         }
     }
 
     // save war json file synchronously on main thread
-    fun writeToJson(path: Path, occupiedChunks: HashMap<String, ArrayList<Int>>, attacksJsonList: ArrayList<StringBuilder>) {
+    fun writeToJson(path: Path, occupiedChunks: HashMap<String, ArrayList<Int>>, attacksJsonList: ArrayList<StringBuilder>, skirmishTargets: LinkedHashMap<String, Int> = linkedMapOf()) {
         // =============================================
         // calculate string builder capacity
 
@@ -123,6 +129,11 @@ object WarSerializer {
         // add 1 to length to account for comma
         for (s in attacksJsonList) {
             bufferSize += (1 + s.length)
+        }
+
+        // skirmishTargets format: "<nation-uuid>":<territoryId>
+        for ((nationId, territoryId) in skirmishTargets) {
+            bufferSize += (7 + nationId.length + territoryId.toString().length)
         }
         // =============================================
 
@@ -164,6 +175,20 @@ object WarSerializer {
             // no comma for last, close with "},"
             else {
                 jsonString.append("]")
+            }
+        }
+
+        jsonString.append("},")
+
+        // ===============================
+        // Skirmish targets
+        // ===============================
+        jsonString.append("\"skirmishTargets\":{")
+
+        for ((i, entry) in skirmishTargets.entries.withIndex()) {
+            jsonString.append(JsonPrimitive(entry.key)).append(":").append(entry.value)
+            if (i < skirmishTargets.size - 1) {
+                jsonString.append(",")
             }
         }
 

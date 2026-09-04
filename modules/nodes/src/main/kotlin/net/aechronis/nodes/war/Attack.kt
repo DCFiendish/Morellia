@@ -12,7 +12,6 @@ import net.aechronis.nodes.objects.Territory
 import net.aechronis.nodes.objects.Town
 import net.aechronis.nodes.objects.townNametagViewedByPlayer
 import net.kyori.adventure.bossbar.BossBar
-import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.minestom.server.MinecraftServer
 import net.minestom.server.coordinate.BlockVec
@@ -40,6 +39,7 @@ class Attack(
     val progressBar: BossBar, // progress bar
     val attackTime: Long, //
     var progress: Long, // initial progress, current tick count
+    val mode: AttackMode = AttackMode.WAR,
 ) : Runnable {
     // no build region
     val noBuildXMin: Int
@@ -111,8 +111,9 @@ class Attack(
         val remainingSeconds = (this.attackTime - this.progress) / FlagWar.ATTACK_TICK
         val completionTime = now + remainingSeconds
 
-        val result = StringBuilder(this.jsonStringBase.length + 20)
+        val result = StringBuilder(this.jsonStringBase.length + 40)
         result.append(this.jsonStringBase)
+        if (mode != AttackMode.WAR) result.append("\"mode\":\"$mode\",")
         result.append("\"t\":$completionTime")
         result.append("}")
 

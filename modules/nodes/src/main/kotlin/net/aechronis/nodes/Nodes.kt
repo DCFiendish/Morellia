@@ -17,6 +17,7 @@ import net.aechronis.nodes.commands.TerritoryCommand
 import net.aechronis.nodes.commands.TownChatCommand
 import net.aechronis.nodes.commands.TownCommand
 import net.aechronis.nodes.commands.UnallyCommand
+import net.aechronis.nodes.commands.WarzoneCommand
 import net.aechronis.nodes.commands.WaypointCommand
 import net.aechronis.nodes.listeners.NodesChatListener
 import net.aechronis.nodes.listeners.NodesChestProtectionDestroyListener
@@ -53,6 +54,7 @@ import net.aechronis.nodes.tasks.TaskSaveBuildings
 import net.aechronis.nodes.tasks.TaskSaveWorld
 import net.aechronis.nodes.utils.loadLongFromFile
 import net.aechronis.nodes.war.FlagWar
+import net.aechronis.nodes.war.Warzone
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Player
 import net.minestom.server.event.EventNode
@@ -96,6 +98,7 @@ object Nodes {
     internal val residents: ConcurrentHashMap<UUID, Resident> = ConcurrentHashMap()
     internal val buildings: CopyOnWriteArrayList<Building> = CopyOnWriteArrayList()
     internal val minimapBuildingsByChunk: ConcurrentHashMap<Coord, Building> = ConcurrentHashMap()
+
     // Both were plain HashMap -- playerWarpTasks is read/written from PortWarpCommand's per-player
     // command executor (a different thread per player, same territories/territoryChunks concern
     // above) *and* removed from PortWarpTask's own scheduled-task callback (the scheduler thread,
@@ -179,6 +182,7 @@ object Nodes {
         MinecraftServer.getCommandManager().register(TerritoryCommand())
         MinecraftServer.getCommandManager().register(PortCommand())
         MinecraftServer.getCommandManager().register(WaypointCommand())
+        MinecraftServer.getCommandManager().register(WarzoneCommand())
         lastBackupTime = loadLongFromFile(config.pathLastBackupTime) ?: System.currentTimeMillis()
         reloadManagers()
         initializeOnlinePlayers()
@@ -200,6 +204,7 @@ object Nodes {
             Resident.create(player)
             val resident = Resident.fromPlayer(player)!!
             Resident.setOnline(resident, player)
+            Warzone.onPlayerTerritoryChanged(player, Territory.fromPlayer(player))
             if (resident.minimap == null) resident.createMinimap(player)
         }
     }
@@ -218,6 +223,7 @@ object Nodes {
         residents.values.forEach { it.destroyMinimap() }
         towns.values.forEach { town -> if (town.income.pushToStorage(true)) town.needsUpdate() }
         if (FlagWar.enabled) FlagWar.cleanup()
+        Warzone.cleanup()
         saveWorld(checkIfNeedsSave = false, async = false)
     }
 
@@ -340,6 +346,7 @@ object Nodes {
             towns.values.forEach { it.getSaveState() }
             nations.values.forEach { it.getSaveState() }
             FlagWar.load()
+            Warzone.load()
             if (!Files.exists(config.pathBuildings)) {
                 System.err.println("No buildings found: ${config.pathBuildings}")
                 return true
@@ -358,6 +365,7 @@ object Nodes {
                 Resident.create(player)
                 val resident = Resident.fromPlayer(player)!!
                 Resident.setOnline(resident, player)
+                Warzone.onPlayerTerritoryChanged(player, Territory.fromPlayer(player))
                 resident.createMinimap(player)
             }
         }
@@ -498,6 +506,10 @@ object Nodes {
                     territory.income.forEach { (material, amount) -> territoryIncome[material] = (territoryIncome[material] ?: 0.0) + amount }
                     territory.chunks.forEach { coord ->
                         chunkToBuilding[listOf(coord.x, coord.z)]?.income()?.forEach { (material, amount) -> territoryIncome[material] = (territoryIncome[material] ?: 0.0) + amount }
+                    }
+                    val warzoneMultiplier = Warzone.multiplierFor(territory)
+                    if (warzoneMultiplier != 1.0) {
+                        territoryIncome.replaceAll { _, amount -> amount * warzoneMultiplier }
                     }
                     territory.occupier?.let { occupier ->
                         val occupierIncome = incomes.getOrPut(occupier) { mutableMapOf() }

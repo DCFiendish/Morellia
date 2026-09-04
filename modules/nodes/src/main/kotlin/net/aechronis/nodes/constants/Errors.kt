@@ -30,6 +30,7 @@ val ErrorChunkHasBuilding = Exception("This chunk already has a building")
 // claim/unclaim errors
 val ErrorTerritoryIsTownHome = Exception("Territory is town home")
 val ErrorTerritoryNotInTown = Exception("Territory does not belong to town")
+val ErrorTerritoryIsWarzone = Exception("Warzone territory must remain inside a town")
 
 // war
 val ErrorNoTerritory = Exception("[War] There is no territory here")
@@ -40,6 +41,9 @@ val ErrorTownNotWhitelisted = Exception("[War] Cannot attack this town (not whit
 val ErrorNotEnemy = Exception("[War] Chunk does not belong to an enemy")
 val ErrorAnnexDisabled = Exception("[War] Territory annexing is disabled")
 val ErrorNotBorderTerritory = Exception("[War] Can only attack border territories")
+val ErrorSkirmishNationRequired = Exception("[War] You must be in a nation to attack during a border skirmish")
+val ErrorSkirmishTargetSelectionRole = Exception("[War] Only a town leader or officer can select a skirmish target")
+val ErrorSkirmishTargetLocked = Exception("[War] Your nation already selected another territory for this skirmish")
 val ErrorChunkNotEdge = Exception("[War] Chunk is not at the edge")
 val ErrorFlagTooHigh = Exception("[War] Flag placement too high, cannot create flag")
 val ErrorSkyBlocked = Exception("[War] Flag must see the sky")

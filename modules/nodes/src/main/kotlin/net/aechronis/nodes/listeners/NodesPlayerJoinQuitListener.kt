@@ -10,8 +10,10 @@ import net.aechronis.nodes.Message
 import net.aechronis.nodes.Nodes
 import net.aechronis.nodes.chat.Chat
 import net.aechronis.nodes.objects.Resident
+import net.aechronis.nodes.objects.Territory
 import net.aechronis.nodes.objects.WaypointMenu
 import net.aechronis.nodes.war.FlagWar
+import net.aechronis.nodes.war.Warzone
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Player
 import net.minestom.server.event.player.PlayerDeathEvent
@@ -30,14 +32,15 @@ object NodesPlayerJoinQuitListener {
         val resident: Resident = Resident.fromPlayer(player)!!
         Resident.setOnline(resident, player)
         resident.createMinimap(player)
+        Warzone.onPlayerTerritoryChanged(player, Territory.fromPlayer(player))
 
-        // if war enabled, send active chunk attack progress bars
-        if (FlagWar.enabled) {
+        // if war or a warzone is active, send active chunk attack progress bars
+        if (FlagWar.enabled || Warzone.hasActiveZones()) {
             FlagWar.sendWarProgressBarToPlayer(player)
         }
 
-        // if war enabled, add per-player text displays for active attacks
-        if (FlagWar.enabled) {
+        // if war or a warzone is active, add per-player text displays for active attacks
+        if (FlagWar.enabled || Warzone.hasActiveZones()) {
             for (attack in FlagWar.chunkToAttacker.values) {
                 attack.textDisplay.update(player)
             }
@@ -83,16 +86,17 @@ object NodesPlayerJoinQuitListener {
 
         // remove player from muting global chat
         Chat.enableGlobalChat(player)
+        Warzone.onPlayerQuit(player)
 
-        // if war enabled, remove per-player town name displays for active attacks
-        if (FlagWar.enabled) {
+        // if war or a warzone is active, remove per-player town name displays for active attacks
+        if (FlagWar.enabled || Warzone.hasActiveZones()) {
             for (attack in FlagWar.chunkToAttacker.values) {
                 attack.textDisplay.removePlayerTextDisplay(player)
             }
         }
 
         // if playing attacking a chunk, stop it
-        if (FlagWar.enabled) {
+        if (FlagWar.enabled || Warzone.hasActiveZones()) {
             val attacks = FlagWar.attackers[player.uuid]
             if (attacks !== null) {
                 // a.cancel() -> FlagWar.cancelAttack() removes the attack from this same list,
