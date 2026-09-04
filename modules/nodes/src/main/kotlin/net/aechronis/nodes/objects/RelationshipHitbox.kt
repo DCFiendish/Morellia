@@ -38,6 +38,12 @@ internal object RelationshipHitbox {
     private val initialized = AtomicBoolean()
     private val pendingRepairs = ConcurrentHashMap.newKeySet<Repair>()
 
+    // Last relationship sent per (viewer, target) pair -- lets refreshViewer/refreshTarget skip a
+    // pair entirely when nothing changed instead of resending an EntityAttributesPacket for every
+    // viewer x target every call, same fix Nametag's lastSent applies to team packets.
+    // ponytail: never pruned on disconnect, grows with player churn -- fine at Morellia's scale.
+    private val lastSent = ConcurrentHashMap<Pair<UUID, UUID>, DiplomaticRelationship>()
+
     @Volatile
     private var active = false
 
@@ -58,6 +64,7 @@ internal object RelationshipHitbox {
     fun stop() {
         active = false
         pendingRepairs.clear()
+        lastSent.clear()
     }
 
     fun refreshViewer(viewer: Player) {
@@ -102,7 +109,10 @@ internal object RelationshipHitbox {
         )
     }
 
-    private fun send(viewer: Player, target: Player) {
+    // force=true bypasses the lastSent cache -- used by scheduleRepair, where the client's
+    // attribute was reset externally and must be resent even though the relationship itself
+    // hasn't changed since our last send.
+    private fun send(viewer: Player, target: Player, force: Boolean = false) {
         if (
             viewer === target ||
             !viewer.isOnline ||
@@ -119,7 +129,17 @@ internal object RelationshipHitbox {
         } else {
             Town.relationshipOfTownToTown(targetTown, Resident.fromPlayer(viewer)?.town)
         }
-        packet(target.entityId, relationship, target.getAttributeValue(Attribute.SCALE))?.let(viewer::sendPacket)
+
+        val key = viewer.uuid to target.uuid
+        if (!force && lastSent[key] == relationship) return
+
+        val sentPacket = packet(target.entityId, relationship, target.getAttributeValue(Attribute.SCALE))
+        if (sentPacket == null) {
+            lastSent.remove(key)
+            return
+        }
+        viewer.sendPacket(sentPacket)
+        lastSent[key] = relationship
     }
 
     private fun onPacketOut(event: PlayerPacketOutEvent) {
@@ -151,7 +171,7 @@ internal object RelationshipHitbox {
             if (!active) return@scheduleNextTick
             val viewer = MinecraftServer.getConnectionManager().getOnlinePlayerByUuid(viewerId) ?: return@scheduleNextTick
             val target = viewer.instance?.getEntityById(entityId) as? Player ?: return@scheduleNextTick
-            send(viewer, target)
+            send(viewer, target, force = true)
         }
     }
 }
