@@ -4,6 +4,7 @@ import net.aechronis.nodes.constants.PermissionsGroup
 import net.aechronis.nodes.constants.TownPermissions
 import net.aechronis.nodes.listeners.NodesBlockPlacementCooldownListener
 import net.aechronis.nodes.objects.MinimapViewerSnapshot
+import net.aechronis.nodes.objects.MiningBoostManager
 import net.aechronis.nodes.objects.Nation
 import net.aechronis.nodes.objects.OreDeposit
 import net.aechronis.nodes.objects.OreSampler
@@ -48,6 +49,7 @@ import java.util.UUID
 import kotlin.math.floor
 import kotlin.math.min
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -226,6 +228,26 @@ class NodesTest {
         Plot.setPlayerPermissions(town, plot, resident, allPermissions, true)
         for (permission in allPermissions) {
             assertEquals(true, plot.playerPermission(resident.uuid, permission))
+        }
+    }
+
+    @Test
+    fun `mining boost validates multiplier range and reports the active multiplier`() {
+        try {
+            assertTrue(MiningBoostManager.addBoost("haste", 0, 1000).isFailure)
+            assertTrue(MiningBoostManager.addBoost("haste", 3, 1000).isFailure, "haste max multiplier is 2")
+            assertFailsWith<IllegalArgumentException> { MiningBoostManager.addBoost("boost", 5, -1) }
+            assertTrue(MiningBoostManager.addBoost("dig", 1, 1000).isFailure, "unknown boost type")
+
+            assertEquals(1, MiningBoostManager.miningMultiplier())
+            val activated = MiningBoostManager.addBoost("boost", 3, 60_000).getOrThrow()
+            assertEquals(3, activated.multiplier)
+            assertEquals(3, MiningBoostManager.miningMultiplier())
+
+            // already-expired boost is treated as absent
+            assertEquals(1, MiningBoostManager.miningMultiplier(now = System.currentTimeMillis() + 120_000))
+        } finally {
+            MiningBoostManager.reset()
         }
     }
 

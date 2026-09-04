@@ -32,10 +32,12 @@ import net.aechronis.nodes.listeners.NodesWorldListener
 import net.aechronis.nodes.objects.Building
 import net.aechronis.nodes.objects.Coord
 import net.aechronis.nodes.objects.MinimapPassengerTracker
+import net.aechronis.nodes.objects.MiningBoostManager
 import net.aechronis.nodes.objects.Nametag
 import net.aechronis.nodes.objects.Nation
 import net.aechronis.nodes.objects.OreBlockCache
 import net.aechronis.nodes.objects.OreSampler
+import net.aechronis.nodes.objects.RelationshipHitbox
 import net.aechronis.nodes.objects.Resident
 import net.aechronis.nodes.objects.ResourceNode
 import net.aechronis.nodes.objects.Territory
@@ -157,6 +159,7 @@ object Nodes {
         MinecraftServer.getGlobalEventHandler().addChild(eventNode)
         MinecraftServer.getGlobalEventHandler().addChild(highPriorityEventNode)
         MinimapPassengerTracker.init()
+        RelationshipHitbox.init()
         NodesChatListener.init()
         NodesChestProtectionListener.init()
         NodesChestProtectionDestroyListener.init()
@@ -185,6 +188,7 @@ object Nodes {
         MinecraftServer.getCommandManager().register(WarzoneCommand())
         lastBackupTime = loadLongFromFile(config.pathLastBackupTime) ?: System.currentTimeMillis()
         reloadManagers()
+        MiningBoostManager.start()
         initializeOnlinePlayers()
         println("Enabled in ${System.currentTimeMillis() - timeStart}ms")
         println("now this is epic")
@@ -205,6 +209,7 @@ object Nodes {
             val resident = Resident.fromPlayer(player)!!
             Resident.setOnline(resident, player)
             Warzone.onPlayerTerritoryChanged(player, Territory.fromPlayer(player))
+            MiningBoostManager.onPlayerJoin(player)
             if (resident.minimap == null) resident.createMinimap(player)
         }
     }
@@ -220,6 +225,7 @@ object Nodes {
     }
 
     internal fun cleanup() {
+        MiningBoostManager.stop()
         residents.values.forEach { it.destroyMinimap() }
         towns.values.forEach { town -> if (town.income.pushToStorage(true)) town.needsUpdate() }
         if (FlagWar.enabled) FlagWar.cleanup()
@@ -308,6 +314,7 @@ object Nodes {
 
     internal fun loadWorld(): Boolean {
         residents.values.forEach { it.destroyMinimap() }
+        MiningBoostManager.reset()
 
         // Previously no catch at all: a parse failure partway through (e.g. malformed
         // towns.json) threw straight past the clears above with towns/nations/residents left
@@ -366,6 +373,7 @@ object Nodes {
                 val resident = Resident.fromPlayer(player)!!
                 Resident.setOnline(resident, player)
                 Warzone.onPlayerTerritoryChanged(player, Territory.fromPlayer(player))
+                MiningBoostManager.onPlayerJoin(player)
                 resident.createMinimap(player)
             }
         }

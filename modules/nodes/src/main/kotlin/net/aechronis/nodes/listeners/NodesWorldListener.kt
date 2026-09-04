@@ -30,6 +30,7 @@ import net.aechronis.nodes.constants.INTERACTIVE_BLOCKS
 import net.aechronis.nodes.constants.PROTECTED_BLOCKS
 import net.aechronis.nodes.constants.PermissionsGroup
 import net.aechronis.nodes.constants.TownPermissions
+import net.aechronis.nodes.objects.MiningBoostManager
 import net.aechronis.nodes.objects.Plot
 import net.aechronis.nodes.objects.Resident
 import net.aechronis.nodes.objects.Territory
@@ -717,7 +718,7 @@ private fun handleHiddenOre(player: Player, block: BlockVec) {
             (Nodes.config.allowOreInNationTowns && territoryNation !== null && territoryNation === playerNation) ||
             (Nodes.config.allowOreInCaptured && (territory.occupier === playerTown || warzoneOccupierTown === playerTown))
         ) {
-            val rateMultiplier = Warzone.multiplierFor(territory)
+            val rateMultiplier = Warzone.multiplierFor(territory) * MiningBoostManager.miningMultiplier()
             val itemDrops = territory.ores.sample(blockY).map { itemStack ->
                 if (rateMultiplier == 1.0) {
                     itemStack

@@ -9,6 +9,7 @@ package net.aechronis.nodes.listeners
 import net.aechronis.nodes.Message
 import net.aechronis.nodes.Nodes
 import net.aechronis.nodes.chat.Chat
+import net.aechronis.nodes.objects.MiningBoostManager
 import net.aechronis.nodes.objects.Resident
 import net.aechronis.nodes.objects.Territory
 import net.aechronis.nodes.objects.WaypointMenu
@@ -33,6 +34,7 @@ object NodesPlayerJoinQuitListener {
         Resident.setOnline(resident, player)
         resident.createMinimap(player)
         Warzone.onPlayerTerritoryChanged(player, Territory.fromPlayer(player))
+        MiningBoostManager.onPlayerJoin(player)
 
         // if war or a warzone is active, send active chunk attack progress bars
         if (FlagWar.enabled || Warzone.hasActiveZones()) {
@@ -75,6 +77,7 @@ object NodesPlayerJoinQuitListener {
 
     fun onPlayerQuit(event: PlayerDisconnectEvent) {
         val player: Player = event.player
+        MiningBoostManager.onPlayerQuit(player)
         val resident = Resident.fromPlayer(player)
         if (resident != null) {
             resident.destroyMinimap()

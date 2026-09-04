@@ -51,6 +51,8 @@ object Nametag {
             return
         }
 
+        RelationshipHitbox.start()
+
         val runnable = Runnable {
             updateAllText()
         }
@@ -73,6 +75,7 @@ object Nametag {
 
         task.cancel()
         this.task = null
+        RelationshipHitbox.stop()
     }
 
     // Last (prefix, members) sent to each viewer per town, keyed by (viewer uuid, town nametag id)
@@ -140,6 +143,7 @@ object Nametag {
 
         for (player in onlinePlayers) {
             updateTextForPlayer(player, membersByTown)
+            RelationshipHitbox.refreshViewer(player)
         }
     }
 }
