@@ -87,9 +87,21 @@ class Resident(val uuid: UUID, val name: String) {
             return resident.chatMode
         }
 
+        private val minimapRenderPending = java.util.concurrent.atomic.AtomicBoolean(false)
+
+        // War/diplomacy events (chunk captures, alliances, etc.) can fire this dozens of times in
+        // the same tick during a large siege -- e.g. a batch of chunks flipping at once -- and each
+        // call used to immediately loop every online player and kick off a fresh async minimap
+        // render for each of them (see H8 in docs/NODES_DEEP_DIVE.md). Collapse same-tick bursts
+        // into a single pass instead: the first call schedules the real work for next tick, every
+        // call after that until then is a no-op.
         fun renderMinimaps() {
-            for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
-                fromPlayer(player)?.minimap?.refresh()
+            if (!minimapRenderPending.compareAndSet(false, true)) return
+            MinecraftServer.getSchedulerManager().scheduleNextTick {
+                minimapRenderPending.set(false)
+                for (player in MinecraftServer.getConnectionManager().onlinePlayers) {
+                    fromPlayer(player)?.minimap?.refresh()
+                }
             }
         }
 

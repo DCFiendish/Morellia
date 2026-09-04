@@ -20,6 +20,11 @@ private const val BAR_SEGMENTS = 10
  * three share one packet/location so the HUD doesn't jump between different screen regions.
  */
 object ActionBarManager {
+    // Last text sent per player -- skips the resend (and the packet Player.sendActionBar always
+    // fires, unlike e.g. AbstractInventory.setItemStack which no-ops on an unchanged value) on the
+    // overwhelmingly common tick where the bar hasn't visibly changed.
+    private val lastSent = mutableMapOf<Player, Component>()
+
     fun start() {
         MinecraftServer
             .getSchedulerManager()
@@ -29,6 +34,10 @@ object ActionBarManager {
                 }
             }.repeat(TaskSchedule.tick(UPDATE_PERIOD_TICKS))
             .schedule()
+    }
+
+    fun clearPlayer(player: Player) {
+        lastSent.remove(player)
     }
 
     private fun update(player: Player) {
@@ -43,6 +52,8 @@ object ActionBarManager {
                     Component.text("Ready ", NamedTextColor.GRAY).append(progressBar(cooldownProgress, NamedTextColor.RED))
                 else -> gun.ammoText(player.itemInMainHand)
             }
+        if (lastSent[player] == text) return
+        lastSent[player] = text
         player.sendActionBar(text)
     }
 

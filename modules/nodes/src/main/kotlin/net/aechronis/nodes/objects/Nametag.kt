@@ -75,22 +75,31 @@ object Nametag {
         this.task = null
     }
 
+    // Last (prefix, members) sent to each viewer per town, keyed by (viewer uuid, town nametag id)
+    // -- lets updateTextForPlayer skip a town entirely when nothing about it changed for that
+    // viewer instead of blindly resending a remove+create packet pair for every town, every
+    // viewer, every second regardless of whether anything actually changed.
+    // ponytail: never pruned on disconnect/town deletion, so this grows with player+town churn
+    // over the server's lifetime -- fine at Morellia's scale, revisit with a quit-listener eviction
+    // if it ever shows up in memory profiling.
+    private val lastSent = mutableMapOf<Pair<java.util.UUID, Int>, Pair<String, List<String>>>()
+
     /**
      * Update nametag text for player
      * Sends team packets directly to the player so they see customized prefixes
      */
     private fun updateTextForPlayer(player: Player, membersByTown: Map<Town, List<String>>) {
-        // remove all existing town teams for this viewer
-        for (town in Nodes.towns.values) {
-            val teamName = "t${town.townNametagId}"
-            player.sendPacket(TeamsPacket(teamName, TeamsPacket.RemoveTeamAction()))
-        }
-
-        // create teams for each town with prefix as viewed by this player
         for (town in Nodes.towns.values) {
             val teamName = "t${town.townNametagId}"
             val prefix = townNametagViewedByPlayer(town, player, space = true)
             val townMembers = membersByTown[town] ?: emptyList()
+
+            val state = prefix to townMembers
+            val key = player.uuid to town.townNametagId
+            if (lastSent[key] == state) continue
+            lastSent[key] = state
+
+            player.sendPacket(TeamsPacket(teamName, TeamsPacket.RemoveTeamAction()))
 
             // create team with customized prefix for this viewer
             val createAction = TeamsPacket.CreateTeamAction(

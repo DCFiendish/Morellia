@@ -121,5 +121,6 @@ object Combat {
         movingPlayers.remove(player)
         sprintingPlayers.remove(player)
         meleeLastAttackTimes.remove(player)
+        ActionBarManager.clearPlayer(player)
     }
 }
