@@ -23,7 +23,7 @@ repo-wide search that found zero mentions of licensing, CC0, or public domain.
 Confirmed by decompiling `net.aechronis:combat:2c63782`'s `Item`/`Gun`/`Melee` classes — any sourced
 model needs to end up as:
 
-- A standard Minecraft Java item-model JSON (Blockbench-exportable) under a `morellia:item/<name>`
+- A standard Minecraft Java item-model JSON (Blockbench-exportable) under a `nodisium:item/<name>`
   resource location, referencing texture PNGs the same way.
 - Wired into a `Gun`/`Melee`/`Item` construction via `itemModel` (the resource location string) and
   `material` (the vanilla base `Material` it renders as) — this is Minestom's modern `item_model`
@@ -48,7 +48,7 @@ validated end-to-end locally.
 Scoped for ~30 guns eventually, so the pattern is designed to stay mechanical as it repeats, not
 just to work once for the musket:
 
-- **File/event convention**: `resourcepack/assets/morellia/sounds/guns/<gun_name>/<event>.ogg`
+- **File/event convention**: `resourcepack/assets/nodisium/sounds/guns/<gun_name>/<event>.ogg`
   (e.g. `guns/musket/fire.ogg`, `guns/musket/reload.ogg`). This matches `Gun.kt`'s
   `soundFire`/`soundReload` defaults exactly (`${Tags.NAMESPACE}:$name.fire`/`.reload`), so a new
   gun needs zero code changes to get sound — just matching files in the right folder.

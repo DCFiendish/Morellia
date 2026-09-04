@@ -1,7 +1,7 @@
 {
 	"credit": "Made with Blockbench",
 	"textures": {
-		"1": "morellia:item/nahkampfmesser"
+		"1": "nodisium:item/nahkampfmesser"
 	},
 	"elements": [
 		{

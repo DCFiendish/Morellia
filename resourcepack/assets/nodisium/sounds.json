@@ -1,22 +1,22 @@
 {
   "musket.fire": {
     "sounds": [
-      "morellia:guns/musket/fire"
+      "nodisium:guns/musket/fire"
     ]
   },
   "musket.reload": {
     "sounds": [
-      "morellia:guns/musket/reload"
+      "nodisium:guns/musket/reload"
     ]
   },
   "kar98k.fire": {
     "sounds": [
-      "morellia:guns/kar98k/fire"
+      "nodisium:guns/kar98k/fire"
     ]
   },
   "kar98k.reload": {
     "sounds": [
-      "morellia:guns/kar98k/reload"
+      "nodisium:guns/kar98k/reload"
     ]
   }
 }

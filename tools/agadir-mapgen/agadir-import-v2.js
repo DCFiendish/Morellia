@@ -5,7 +5,7 @@
 // latitude-driven as much as elevation-driven).
 //
 // NOT YET RUN as of this commit -- v1 (agadir-world-export-vegetated, currently what
-// morellia-data/world/ holds) is the last version actually verified booting in Minestom.
+// nodisium-data/world/ holds) is the last version actually verified booting in Minestom.
 // This is the next step, written but not yet executed/verified. Run with:
 //   wpscript agadir-import-v2.js
 // from a directory containing agadir-heightmap-16bit-smoothed.png (convert_heightmap.py),

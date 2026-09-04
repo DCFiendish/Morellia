@@ -88,7 +88,7 @@ whole step is conditional, not mandatory ceremony.
 Match `springfield.json`'s existing scale — real-world rifle lengths in this era (Kar98K,
 Springfield 1903, Karabiner 98k) are close enough that reusing the same target Blockbench-unit
 length is a reasonable default; don't re-derive from meters. Save the working file as a `.bbmodel`
-under `resourcepack/assets/morellia/models/item/` (this is a **scratch/working file**, not the
+under `resourcepack/assets/nodisium/models/item/` (this is a **scratch/working file**, not the
 finished asset — the real deliverable is the obj³ export in step 4).
 
 ## 3.5. Recenter the grip point to local origin
@@ -311,10 +311,10 @@ Once the pose is confirmed, wire it into the real weapon definition:
   `TestWeapons.kt` pipeline until the pose is fully confirmed.
 - If a dev client's saved inventory from a previous test session is stale, it can silently
   overwrite the spawn-time test item — move the player's `.dat` file aside
-  (`server/morellia-data/vanilla/playerdata/<uuid>.dat`) if the test item doesn't appear.
-- Launching `gradlew.bat` for either the server or `morellia-testclient` from a Bash tool's
+  (`server/nodisium-data/vanilla/playerdata/<uuid>.dat`) if the test item doesn't appear.
+- Launching `gradlew.bat` for either the server or `nodisium-testclient` from a Bash tool's
   `cmd //c` wrapper silently fails with "not recognized as an internal or external command" when
-  the working directory path contains a space (e.g. `Minecraft Dev\morellia-testclient`) — `cd`,
+  the working directory path contains a space (e.g. `Minecraft Dev\nodisium-testclient`) — `cd`,
   `dir`, and `where` all work fine from the same wrapper, only the actual `gradlew.bat` invocation
   breaks, for reasons not fully root-caused. Use the PowerShell tool instead
   (`Start-Process -FilePath ".\gradlew.bat" -ArgumentList ... -RedirectStandardOutput ...`) for

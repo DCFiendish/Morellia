@@ -39,7 +39,7 @@ object ResourcePack {
         val request = ResourcePackRequest.resourcePackRequest()
             .packs(info)
             .required(true)
-            .prompt(Component.text("Morellia needs this resource pack (minimap rendering, custom textures)."))
+            .prompt(Component.text("Nodisium needs this resource pack (minimap rendering, custom textures)."))
             .build()
 
         MinecraftServer.getGlobalEventHandler().addListener(AsyncPlayerConfigurationEvent::class.java) { event ->

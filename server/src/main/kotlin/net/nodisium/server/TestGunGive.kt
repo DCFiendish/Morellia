@@ -20,7 +20,7 @@ import net.minestom.server.item.component.CustomModelData
  * "kar98k" is special-cased below to hand the real, fully-loaded [TestWeapons.kar98k] Gun instead
  * of the bare placeholder stack -- the only one of these eight wired into real combat stats so far.
  */
-class TestGunGive : Command("testgun", "morellia.testgun") {
+class TestGunGive : Command("testgun", "nodisium.testgun") {
     companion object {
         private val WEAPONS =
             linkedMapOf(

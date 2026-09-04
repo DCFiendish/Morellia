@@ -1,4 +1,4 @@
-rootProject.name = "morellia"
+rootProject.name = "nodisium"
 
 include(":server")
 include(":modules:nodes")

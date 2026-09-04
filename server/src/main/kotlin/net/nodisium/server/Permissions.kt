@@ -26,7 +26,7 @@ import java.nio.file.Path
  * at boot -- offline-mode UUIDs come from whatever the connecting client sends in its login packet
  * (confirmed via decompiling Minestom's LoginListener: it trusts ClientLoginStartPacket.profileId()
  * as-is, no server-side "OfflinePlayer:<name>" hashing), so a client-specific UUID scheme (e.g. the
- * morellia-testclient dev client) won't match that guess. Using `player.uuid` at actual spawn time
+ * nodisium-testclient dev client) won't match that guess. Using `player.uuid` at actual spawn time
  * is the real key LuckPerms checks permissions against, whatever it turns out to be.
  */
 object Permissions {
@@ -44,8 +44,8 @@ object Permissions {
 
     fun init() {
         LuckPermsMinestom
-            .builder(Path.of("morellia-data/luckperms"))
-            .permissionSuggestions(defaultNodes + modNodes + setOf("nodes.admin", "morellia.testgun", "vanilla.setwarp", "vanilla.convert", "*"))
+            .builder(Path.of("nodisium-data/luckperms"))
+            .permissionSuggestions(defaultNodes + modNodes + setOf("nodes.admin", "nodisium.testgun", "vanilla.setwarp", "vanilla.convert", "*"))
             .commandRegistry(CommandRegistry.minestom())
             .enable()
 

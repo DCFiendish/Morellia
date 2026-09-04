@@ -4,7 +4,7 @@ import net.minestom.server.tag.Tag
 import java.util.UUID
 
 internal object Tags {
-    const val NAMESPACE = "morellia"
+    const val NAMESPACE = "nodisium"
 
     /** Which registered [net.nodisium.combat.objects.Item] a stack corresponds to. */
     val NAME: Tag<String> = Tag.String("combat_item_name")

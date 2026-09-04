@@ -7,8 +7,8 @@ build/
 # Runtime save data (player inventories, town/nation state, old test worlds) -- generated at
 # runtime, not source. The pvp playtest map and its set warp points are the exception: both are
 # real deliverables for the playtest, not regenerable, so they're tracked.
-morellia-data/*
-!morellia-data/nodisium-playtest-map/
-!morellia-data/vanilla/
-morellia-data/vanilla/*
-!morellia-data/vanilla/warps.json
+nodisium-data/*
+!nodisium-data/nodisium-playtest-map/
+!nodisium-data/vanilla/
+nodisium-data/vanilla/*
+!nodisium-data/vanilla/warps.json

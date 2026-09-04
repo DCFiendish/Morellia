@@ -11,7 +11,7 @@ import java.nio.file.Path
  * was constructed with -- pass [StoneFlatTerrain.generator] for that.
  */
 object AgadirWorld {
-    // morellia-data/world is a full Minecraft world save folder (level.dat, data/, dimensions/,
+    // nodisium-data/world is a full Minecraft world save folder (level.dat, data/, dimensions/,
     // session.lock) -- the export root produced by tools/agadir-mapgen/, copied in as-is.
     // Minestom's AnvilLoader(Path) resolves level.dat and dimensions/<namespace>/<value>/region
     // itself (confirmed by disassembling AnvilLoader.class), so PATH must be the world root, NOT
@@ -19,14 +19,14 @@ object AgadirWorld {
     // this comment (and of tools/agadir-mapgen/README.md's step 5) assumed the opposite and was
     // wrong; both are fixed now.
     //
-    // Regenerate via tools/agadir-mapgen/ if this directory is ever missing (morellia-data/ is
+    // Regenerate via tools/agadir-mapgen/ if this directory is ever missing (nodisium-data/ is
     // gitignored -- this ~230MB+ world is not committed).
     //
-    // MORELLIA_WORLD_PATH overrides this for fast iteration against a small test map (see
+    // NODISIUM_WORLD_PATH overrides this for fast iteration against a small test map (see
     // tools/agadir-mapgen/agadir-import-test.js) without touching the real world or needing a
     // separate Main-like entry point -- e.g.
-    // MORELLIA_WORLD_PATH=morellia-data/test-world ./gradlew.bat :server:run
-    val PATH: String = System.getenv("MORELLIA_WORLD_PATH") ?: "morellia-data/world"
+    // NODISIUM_WORLD_PATH=nodisium-data/test-world ./gradlew.bat :server:run
+    val PATH: String = System.getenv("NODISIUM_WORLD_PATH") ?: "nodisium-data/world"
 
     fun attach(instance: InstanceContainer) {
         instance.setChunkLoader(AnvilLoader(Path.of(PATH)))

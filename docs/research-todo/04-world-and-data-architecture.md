@@ -17,7 +17,7 @@ terrain sources were tried and both are now removed from the codebase:
 The real-geodata 1911 border/territory pipeline (Natural Earth country boundaries, organic
 geodesic-partition tiling, described in the paragraph below) **only ever wrote to the production
 server's own `nodes` data files directly over SSH — it was never brought into this repo's local
-`morellia-data/nodes/`**, which still holds the small 2-town flat-world test fixture it always had.
+`nodisium-data/nodes/`**, which still holds the small 2-town flat-world test fixture it always had.
 So no local nodes/territory data needs to change as part of this revert.
 
 The server now runs on **plain flat stone superflat terrain** (`StoneFlatTerrain.generator`,

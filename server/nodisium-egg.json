@@ -1,13 +1,13 @@
 {
-    "_comment": "Morellia (Minestom) egg — import via Admin → Nests → Minecraft → Import Egg",
+    "_comment": "Nodisium (Minestom) egg — import via Admin → Nests → Minecraft → Import Egg",
     "meta": {
         "version": "PTDL_v2",
         "update_url": null
     },
     "exported_at": "2026-07-30T00:00:00+00:00",
-    "name": "Morellia (Minestom)",
-    "author": "patri@morellia",
-    "description": "Custom Minestom-based server for the Morellia project. No stdin console commands are supported — Minestom has no built-in console reader and none of the aechronis libraries add one, so stop is signal-based (SIGINT) rather than a text command.",
+    "name": "Nodisium (Minestom)",
+    "author": "patri@nodisium",
+    "description": "Custom Minestom-based server for the Nodisium project. No stdin console commands are supported — Minestom has no built-in console reader and none of the aechronis libraries add one, so stop is signal-based (SIGINT) rather than a text command.",
     "features": [],
     "docker_images": {
         "Java 25": "ghcr.io/pterodactyl/yolks:java_25"
@@ -16,7 +16,7 @@
     "startup": "java -Xms1G -XX:MaxRAMPercentage=80.0 -Dminestom.dispatcher-threads=4 -jar {{SERVER_JARFILE}}",
     "config": {
         "files": "{}",
-        "startup": "{\"done\":\"Morellia test server ready\"}",
+        "startup": "{\"done\":\"Nodisium test server ready\"}",
         "logs": "[]",
         "file_denylist": [],
         "stop": "^C",
@@ -24,7 +24,7 @@
     },
     "scripts": {
         "installation": {
-            "script": "#!/bin/ash\n# Morellia install step — the jar is built locally (private GitHub Packages deps)\n# and uploaded via SFTP after server creation, not built inside this container.\n# This step just makes sure the server directory exists.\nmkdir -p /mnt/server\necho \"Morellia: upload ${SERVER_JARFILE:-server.jar} via SFTP, then start the server.\"\n",
+            "script": "#!/bin/ash\n# Nodisium install step — the jar is built locally (private GitHub Packages deps)\n# and uploaded via SFTP after server creation, not built inside this container.\n# This step just makes sure the server directory exists.\nmkdir -p /mnt/server\necho \"Nodisium: upload ${SERVER_JARFILE:-server.jar} via SFTP, then start the server.\"\n",
             "container": "ghcr.io/pterodactyl/installers:alpine",
             "entrypoint": "ash"
         }

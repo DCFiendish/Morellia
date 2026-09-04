@@ -3,7 +3,7 @@
 Per `docs/research-todo/10-asset-sourcing-and-licensing.md`'s policy: source + license per asset,
 recorded here as they're added.
 
-## Kar98K (`resourcepack/assets/morellia/models/item/kar98k-import.bbmodel`, exported via obj³)
+## Kar98K (`resourcepack/assets/nodisium/models/item/kar98k-import.bbmodel`, exported via obj³)
 
 - **Source**: "Low-Poly Kar98K" by TastyTony —
   https://sketchfab.com/3d-models/low-poly-kar98k (glTF/.glb download)
@@ -18,7 +18,7 @@ recorded here as they're added.
   see `docs/blockbench-reference/obj3_weapon_import_playbook.md` for the full process. TastyTony
   has several more rifles in the same series; the same import fixes are expected to apply.
 
-## Lebel M1886 (`resourcepack/assets/morellia/models/item/lebel-m1886-import.bbmodel`, exported via obj³)
+## Lebel M1886 (`resourcepack/assets/nodisium/models/item/lebel-m1886-import.bbmodel`, exported via obj³)
 
 - **Source**: "Low-Poly Lebel M1886" by TastyTony —
   https://sketchfab.com/3d-models/low-poly-lebel-m1886-0515c4d0454c430ab7f9a93f1671428c (glTF/.glb
@@ -70,7 +70,7 @@ recorded here as they're added.
   of these six have been checked against the real Minecraft client yet; do that before wiring any of
   them into `TestWeapons.kt` for real.
 
-## US M1918 Mk1 trench knife (`assets/morellia/models/item/us_trench_knife.json`, `.../us_trench_knife.png`)
+## US M1918 Mk1 trench knife (`assets/nodisium/models/item/us_trench_knife.json`, `.../us_trench_knife.png`)
 
 - **Source**: same pack (memava's "WWI & WWII rifles", v8.5), MIT license.
 - **Pulled**: 2026-08-26
@@ -79,7 +79,7 @@ recorded here as they're added.
   (`item/bayonets/usm1892.json`/`.png`) as the closest available US WWI-era blade silhouette. Replace
   with a real M1918 Mk1 trench-knife model when one is sourced.
 
-## Nahkampfmesser (`assets/morellia/models/item/nahkampfmesser.json`, `.../nahkampfmesser.png`)
+## Nahkampfmesser (`assets/nodisium/models/item/nahkampfmesser.json`, `.../nahkampfmesser.png`)
 
 - **Source**: same pack (memava's "WWI & WWII rifles", v8.5), MIT license.
 - **Pulled**: 2026-08-26
@@ -87,7 +87,7 @@ recorded here as they're added.
   model (`item/bayonets/s8498.json`/`.png`) as the closest available German-made blade. Replace with a
   real Nahkampfmesser model when one is sourced.
 
-## Couteau Poignard Modele 1916 (`assets/morellia/models/item/couteau_poignard.json`, `.../couteau_poignard.png`)
+## Couteau Poignard Modele 1916 (`assets/nodisium/models/item/couteau_poignard.json`, `.../couteau_poignard.png`)
 
 - **Source**: same pack (memava's "WWI & WWII rifles", v8.5), MIT license.
 - **Pulled**: 2026-08-26
@@ -97,7 +97,7 @@ recorded here as they're added.
   separate one-handed push-dagger design, not this rifle bayonet. Replace with a real model when
   sourced.
 
-## Musket fire sound (`assets/morellia/sounds/guns/musket/fire.ogg`)
+## Musket fire sound (`assets/nodisium/sounds/guns/musket/fire.ogg`)
 
 - **Source**: "Gunshot Sounds" pack by Vincent Sevedge —
   https://opengameart.org/content/gunshot-sounds (`mosin.wav` from `sounds.zip`)
@@ -112,7 +112,7 @@ recorded here as they're added.
   trim/convert method). User picked this take over two other trimmed candidates from the same
   recording.
 
-## Musket reload sound (`assets/morellia/sounds/guns/musket/reload.ogg`)
+## Musket reload sound (`assets/nodisium/sounds/guns/musket/reload.ogg`)
 
 - **Source**: "Equipment Clicks III" by an OpenGameArt contributor —
   https://opengameart.org/content/equipment-clicks-iii (`equipment_clicks3.wav`)
@@ -124,7 +124,7 @@ recorded here as they're added.
   this is a generic "bolt-action rifle" sound, reusable as-is for any future bolt-action gun until/
   unless a gun-specific reload sound is sourced (see the asset-sourcing doc's category-reuse note).
 
-## Kar98k fire/reload sound (`assets/morellia/sounds/guns/kar98k/{fire,reload}.ogg`)
+## Kar98k fire/reload sound (`assets/nodisium/sounds/guns/kar98k/{fire,reload}.ogg`)
 
 - **Source**: same underlying files as the musket's fire/reload sounds above (Vincent Sevedge's
   Mosin Nagant gunshot / the generic bolt-action-cocking clip), copied into a per-gun folder --

@@ -21,3 +21,8 @@ desktop.ini
 # Raw third-party downloads and local backup copies -- not source, not tracked.
 /Downloaded glb assets/
 *.bak
+
+# Runtime server data (world saves, player state, DB) -- regenerates at runtime,
+# not source.
+/server/nodisium-data/
+/server/combat/hats/

@@ -38,13 +38,13 @@ fun main() {
     // rather than the standard single-player format (region/ at the root), so AnvilLoader needs the
     // overworld subfolder directly -- pointing it at the map root finds no region/ and silently falls
     // back to StoneFlatTerrain.generator for every chunk.
-    instance.setChunkLoader(AnvilLoader(Path.of("morellia-data/nodisium-playtest-map/dimensions/minecraft/overworld")))
+    instance.setChunkLoader(AnvilLoader(Path.of("nodisium-data/nodisium-playtest-map/dimensions/minecraft/overworld")))
     instance.setChunkSupplier(::FullbrightChunk)
     // Real permission gating -- see Permissions.kt kdoc. Enabled before any command registers so
     // every hasPermission check from here on resolves against real group data, not a missing provider.
     Permissions.init()
     // warpsConfig.warps stays empty here -- the 4 koth warps were set live via /setwarp and are
-    // already persisted in morellia-data/vanilla/warps.json (Warp.loadPersisted reads them back
+    // already persisted in nodisium-data/vanilla/warps.json (Warp.loadPersisted reads them back
     // on boot, see Warp.kt kdoc). pvpPrepConfig.zones has no in-game equivalent of /setwarp, so
     // each landing spot's no-damage/no-break box is defined here from exact WorldEdit corners
     // picked in-game at each warp's landing platform.
@@ -61,7 +61,7 @@ fun main() {
         prepZone("koth4", BlockVec(9, -23, 207), BlockVec(6, -20, 213)),
         prepZone("spawn", BlockVec(159, 107, 144), BlockVec(144, 104, 159)),
     )
-    Vanilla.init(VanillaConfig(path = "morellia-data/vanilla", pvpPrepConfig = PvpPrepConfig(zones = prepZones)))
+    Vanilla.init(VanillaConfig(path = "nodisium-data/vanilla", pvpPrepConfig = PvpPrepConfig(zones = prepZones)))
     // Testing-only: cut capture time way down so siege tests don't take forever. Both test
     // territories are wilderness-bordering AND each town's home, so wasteland (2x) and home (2x)
     // multipliers stack: actual capture time = chunkAttackTime(ms) * 0.004. 7500ms -> 30s actual.
@@ -69,14 +69,14 @@ fun main() {
     // defaultRespawnPoint governs where townless players land on death (PlayerRespawnEvent),
     // separately from the instance's own spawnPoint above which only applies on first join --
     // without this it defaults to (0,64,0), off the edge of the Nodisium map.
-    Nodes.initialize(NodesConfig(path = "morellia-data/nodes", chunkAttackTime = 7500, defaultRespawnPoint = spawnPoint, canInteractInEmpty = false, canInteractInUnclaimed = false, adminUsernames = setOf("DCFiendish")))
+    Nodes.initialize(NodesConfig(path = "nodisium-data/nodes", chunkAttackTime = 7500, defaultRespawnPoint = spawnPoint, canInteractInEmpty = false, canInteractInUnclaimed = false, adminUsernames = setOf("DCFiendish")))
     Combat.initialize()
     // Admin build/grief-cleanup tool for the pvp playtest -- ported from Aechronis/aechronis's
     // modules/worldedit (a Minestom platform adapter over the real sk89q worldedit-core, not a
     // reimplementation). Their own AechronisModule/ModuleContext service-loader wrapper and
     // ModuleEvents helper don't exist here -- stripped in favor of calling this directly, same
     // convention as Vanilla.init()/Nodes.initialize()/Combat.initialize() above.
-    MinestomWorldEdit().init(WorldEditConfig(dataFolder = File("morellia-data/worldedit")))
+    MinestomWorldEdit().init(WorldEditConfig(dataFolder = File("nodisium-data/worldedit")))
     TestWeapons.register()
     ResourcePack.init()
     TickMonitor.init()
@@ -85,10 +85,10 @@ fun main() {
     // (createTownIfMissing) even after they're wiped from the save data.
     PvpKit.init()
     // Perf profiler -- /spark ..., self-registers its own commands (`.commands(true)`). Same
-    // morellia.<node> permission convention as every other admin command here (see TestGunGive's
-    // "morellia.testgun", backed by the same net.aechronis.utils.hasPermission); console is always
+    // nodisium.<node> permission convention as every other admin command here (see TestGunGive's
+    // "nodisium.testgun", backed by the same net.aechronis.utils.hasPermission); console is always
     // allowed, matching every other CommandSender that isn't a Player.
-    SparkMinestom.builder(Path.of("morellia-data/spark"))
+    SparkMinestom.builder(Path.of("nodisium-data/spark"))
         .commands(true)
         .permissionHandler { sender, permission -> sender is ConsoleSender || (sender is Player && sender.hasPermission(permission)) }
         .enable()
@@ -100,5 +100,5 @@ fun main() {
     // /nodesadmin war enable first. Remove alongside LoadTestBots once real players take over.
     Nodes.enableWar()
 
-    println("Morellia test server ready — port 25567, offline mode")
+    println("Nodisium test server ready — port 25567, offline mode")
 }

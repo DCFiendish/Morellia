@@ -8,7 +8,7 @@ line) rather than a hand-rolled generator.
 
 ## Status as of this commit
 
-- **`morellia-data/world/` (gitignored, ~230MB) holds the "vegetated" pass** — real elevation
+- **`nodisium-data/world/` (gitignored, ~230MB) holds the "vegetated" pass** — real elevation
   (smoothed), latitude-agnostic elevation-banded terrain, WorldPainter's built-in Deciduous/Pine
   forest layers (density too low — see Open items), Frost above ~2500m. This is the last
   version actually verified booting cleanly in Minestom with a connected client.
@@ -63,13 +63,13 @@ line) rather than a hand-rolled generator.
 
 5. **Copy into place and point `AgadirWorld.kt` at it**:
    ```
-   cp -r agadir-world-export-v2/<generated-name>/. ../../server/morellia-data/world/
+   cp -r agadir-world-export-v2/<generated-name>/. ../../server/nodisium-data/world/
    ```
    Copy the **export root itself** (the folder containing `level.dat`, `data/`, `dimensions/`,
-   `session.lock`) — `morellia-data/world` should end up looking exactly like a normal Minecraft
+   `session.lock`) — `nodisium-data/world` should end up looking exactly like a normal Minecraft
    world save folder. (An earlier version of this doc said to copy only the inner
    `dimensions/minecraft/overworld` folder's contents instead, i.e. flatten `region/` up to
-   `morellia-data/world/region`. That was wrong — confirmed by disassembling Minestom's actual
+   `nodisium-data/world/region`. That was wrong — confirmed by disassembling Minestom's actual
    `AnvilLoader.class`: its constructor does
    `path.resolve("level.dat")` and separately
    `path.resolve("dimensions").resolve(key.namespace()).resolve(key.value()).resolve("region")`,
@@ -96,7 +96,7 @@ line) rather than a hand-rolled generator.
 - **Vanilla's `PlayerData` restores saved position on every join** (`modules/vanilla/.../
   managers/PlayerData.kt`, `PlayerSpawnEvent` + `isFirstSpawn`) — changing `Main.kt`'s spawn
   point does nothing for a player who has ever joined before; their saved `.dat` file under
-  `morellia-data/vanilla/playerdata/` wins. Autosaves every 300s and on disconnect, so editing
+  `nodisium-data/vanilla/playerdata/` wins. Autosaves every 300s and on disconnect, so editing
   that file while a session is still live gets silently overwritten — stop the server first.
 
 ## Custom object layers — RESOLVED, `wpscript` can paint and export them

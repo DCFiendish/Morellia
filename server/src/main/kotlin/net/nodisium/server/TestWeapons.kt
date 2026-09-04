@@ -215,7 +215,7 @@ object TestWeapons {
         Melee(
             name = "us_trench_knife",
             itemName = Component.text("US M1918 Mk1 Trench Knife"),
-            itemModel = "morellia:us_trench_knife",
+            itemModel = "nodisium:us_trench_knife",
             damage = 6.0,
             attackSpeed = 2.0,
         )
@@ -224,7 +224,7 @@ object TestWeapons {
         Melee(
             name = "nahkampfmesser",
             itemName = Component.text("Nahkampfmesser"),
-            itemModel = "morellia:nahkampfmesser",
+            itemModel = "nodisium:nahkampfmesser",
             damage = 6.0,
             attackSpeed = 2.0,
         )
@@ -233,7 +233,7 @@ object TestWeapons {
         Melee(
             name = "couteau_poignard",
             itemName = Component.text("Couteau Poignard Modele 1916"),
-            itemModel = "morellia:couteau_poignard",
+            itemModel = "nodisium:couteau_poignard",
             damage = 6.0,
             attackSpeed = 2.0,
         )

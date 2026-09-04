@@ -41,7 +41,7 @@ internal object RelationshipHitbox {
     // Last relationship sent per (viewer, target) pair -- lets refreshViewer/refreshTarget skip a
     // pair entirely when nothing changed instead of resending an EntityAttributesPacket for every
     // viewer x target every call, same fix Nametag's lastSent applies to team packets.
-    // ponytail: never pruned on disconnect, grows with player churn -- fine at Morellia's scale.
+    // ponytail: never pruned on disconnect, grows with player churn -- fine at Nodisium's scale.
     private val lastSent = ConcurrentHashMap<Pair<UUID, UUID>, DiplomaticRelationship>()
 
     @Volatile

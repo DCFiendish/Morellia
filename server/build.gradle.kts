@@ -31,7 +31,7 @@ dependencies {
     implementation("dev.lu15:spark-minestom:1.10-SNAPSHOT")
     // Real permission gating — ConceptMC's Minestom port of LuckPerms, same lib+wiring as
     // Aechronis/aechronis's own Server.kt. See net.nodisium.server.Permissions. H2 is its default
-    // storage backend (file-based, morellia-data/luckperms/) — no external DB needed for this.
+    // storage backend (file-based, nodisium-data/luckperms/) — no external DB needed for this.
     implementation("com.conceptmc:luckperms-minestom:5.5-SNAPSHOT")
     implementation("com.h2database:h2:2.4.240")
     implementation("com.zaxxer:HikariCP:7.1.0")
@@ -42,7 +42,7 @@ application {
 }
 
 tasks.shadowJar {
-    archiveBaseName.set("morellia-server")
+    archiveBaseName.set("nodisium-server")
     archiveClassifier.set("")
     archiveVersion.set("")
     mergeServiceFiles()

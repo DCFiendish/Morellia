@@ -83,7 +83,7 @@ object Nametag {
     // viewer instead of blindly resending a remove+create packet pair for every town, every
     // viewer, every second regardless of whether anything actually changed.
     // ponytail: never pruned on disconnect/town deletion, so this grows with player+town churn
-    // over the server's lifetime -- fine at Morellia's scale, revisit with a quit-listener eviction
+    // over the server's lifetime -- fine at Nodisium's scale, revisit with a quit-listener eviction
     // if it ever shows up in memory profiling.
     private val lastSent = mutableMapOf<Pair<java.util.UUID, Int>, Pair<String, List<String>>>()
 

@@ -1,7 +1,7 @@
 {
 	"credit": "Made with Blockbench",
 	"textures": {
-		"1": "morellia:item/couteau_poignard"
+		"1": "nodisium:item/couteau_poignard"
 	},
 	"elements": [
 		{

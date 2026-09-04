@@ -1,6 +1,6 @@
 ---
 name: blockbench-modeling
-description: Build or edit Minecraft models (items, blocks, custom weapons/props) in Blockbench via the blockbench MCP tools for the Morellia resource pack. Use whenever placing cubes, texturing, or exporting a model through mcp__blockbench__* tools.
+description: Build or edit Minecraft models (items, blocks, custom weapons/props) in Blockbench via the blockbench MCP tools for the Nodisium resource pack. Use whenever placing cubes, texturing, or exporting a model through mcp__blockbench__* tools.
 ---
 
 Distilled from the Blockbench MCP plugin author's own agent guidance (see `blockbench-reference/prompts/` in this repo for the verbatim source files, pulled from https://github.com/jasonjgardner/blockbench-mcp-plugin).
